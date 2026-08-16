@@ -34,6 +34,8 @@ test("Pi exposes a zero-parent-turn /btw extension command", async () => {
   );
   assert.match(extension, /registerCommand\("btw"/);
   assert.match(extension, /registerCommand\("paseo-btw"/);
+  assert.match(extension, /\/skill:paseo-btw/);
+  assert.match(extension, /action: "handled"/);
   assert.match(extension, /bin\/paseo-btw\.mjs/);
   assert.doesNotMatch(extension, /sendUserMessage|sendMessage|registerTool/);
 });

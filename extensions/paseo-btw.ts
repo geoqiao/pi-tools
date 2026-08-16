@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const execFileAsync = promisify(execFile);
 const launcher = fileURLToPath(new URL("../bin/paseo-btw.mjs", import.meta.url));
@@ -10,47 +10,61 @@ const configScript = fileURLToPath(
 );
 
 export default function paseoBtwExtension(pi: ExtensionAPI) {
+  const launchPrompt = async (rawPrompt: string, ctx: ExtensionContext) => {
+    const prompt = rawPrompt.trim();
+    if (!prompt) {
+      ctx.ui.notify("Usage: /btw <side question>", "warning");
+      return;
+    }
+
+    const parentAgentId = process.env.PASEO_AGENT_ID?.trim();
+    if (!parentAgentId) {
+      ctx.ui.notify("/btw requires a Paseo-managed Pi agent", "error");
+      return;
+    }
+
+    try {
+      const { stdout } = await execFileAsync(
+        process.execPath,
+        [launcher, "--parent-agent-id", parentAgentId, "--cwd", ctx.cwd, "--prompt", prompt],
+        {
+          encoding: "utf8",
+          maxBuffer: 1_000_000,
+          timeout: 45_000,
+        },
+      );
+      const result = JSON.parse(stdout) as {
+        agentId: string;
+        title: string;
+        warning?: string;
+      };
+      const warning = result.warning ? `\n${result.warning}` : "";
+      ctx.ui.notify(`Started ${result.title}\n${result.agentId}${warning}`, "info");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      ctx.ui.notify(`BTW failed: ${message}`, "error");
+    }
+  };
+
   const btwCommand = {
     description: "Open a Paseo side conversation without running the parent model",
-    handler: async (args, ctx) => {
-      const prompt = args.trim();
-      if (!prompt) {
-        ctx.ui.notify("Usage: /btw <side question>", "warning");
-        return;
-      }
-
-      const parentAgentId = process.env.PASEO_AGENT_ID?.trim();
-      if (!parentAgentId) {
-        ctx.ui.notify("/btw requires a Paseo-managed Pi agent", "error");
-        return;
-      }
-
-      try {
-        const { stdout } = await execFileAsync(
-          process.execPath,
-          [launcher, "--parent-agent-id", parentAgentId, "--cwd", ctx.cwd, "--prompt", prompt],
-          {
-            encoding: "utf8",
-            maxBuffer: 1_000_000,
-            timeout: 45_000,
-          },
-        );
-        const result = JSON.parse(stdout) as {
-          agentId: string;
-          title: string;
-          warning?: string;
-        };
-        const warning = result.warning ? `\n${result.warning}` : "";
-        ctx.ui.notify(`Started ${result.title}\n${result.agentId}${warning}`, "info");
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        ctx.ui.notify(`BTW failed: ${message}`, "error");
-      }
-    },
+    handler: launchPrompt,
   } satisfies Parameters<ExtensionAPI["registerCommand"]>[1];
 
   pi.registerCommand("btw", btwCommand);
   pi.registerCommand("paseo-btw", btwCommand);
+
+  pi.on("input", async (event, ctx) => {
+    if (event.source === "extension") return { action: "continue" };
+    const match = /^\/skill:paseo-btw(?:\s+([\s\S]*))?$/u.exec(event.text);
+    if (!match) return { action: "continue" };
+    if ((event.images?.length ?? 0) > 0) {
+      ctx.ui.notify("/skill:paseo-btw cannot forward image attachments through the CLI", "error");
+      return { action: "handled" };
+    }
+    await launchPrompt(match[1] ?? "", ctx);
+    return { action: "handled" };
+  });
 
   pi.registerCommand("btw-config", {
     description: "Show or change BTW defaults without running the parent model",

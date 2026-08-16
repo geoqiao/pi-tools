@@ -33,6 +33,10 @@ load Pi extensions. It necessarily uses one parent model turn:
 /skill:paseo-btw --profile 低成本精修 explain this stack trace
 ```
 
+When the Pi extension is loaded, it intercepts `/skill:paseo-btw ...` before Skill expansion and
+routes it through the same zero-parent-turn CLI. The model-mediated behavior above applies only to
+hosts that cannot load the extension.
+
 The native command inherits the parent's Paseo provider/model and thinking setting plus a bounded
 mechanical snapshot of the parent's Paseo text timeline by default. The model-mediated Skill can
 also copy mode and feature values. Configure persistent defaults with:
