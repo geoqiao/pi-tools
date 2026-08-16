@@ -1,6 +1,6 @@
 {
   "name": "@geoqiao/paseo-btw",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Portable Paseo side-conversation commands and skills for Pi, Codex, and Claude Code.",
   "type": "module",
   "files": [

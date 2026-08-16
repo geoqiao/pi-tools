@@ -1,3 +1,9 @@
+## 1.2.3
+
+### Patch Changes
+
+- Publish `@geoqiao/pi-ask` independently from the new `geoqiao/pi-tools` workspace without changing its runtime contract.
+
 ## [1.2.2](https://github.com/geoqiao/pi-ask/compare/v1.2.1...v1.2.2) (2026-08-16)
 
 
