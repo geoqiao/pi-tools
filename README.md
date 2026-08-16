@@ -20,6 +20,22 @@ Examples:
 /skill:paseo-btw --profile 低成本精修 explain this stack trace
 ```
 
+The child inherits the parent's Paseo provider/model, thinking setting, and a portable relevant
+context snapshot by default. Configure persistent defaults with:
+
+```text
+/skill:paseo-btw config
+/skill:paseo-btw config model inherit
+/skill:paseo-btw config model claude/claude-haiku-4-5
+/skill:paseo-btw config context inherit
+/skill:paseo-btw config context none
+/skill:paseo-btw config reset
+```
+
+One-off `--model` and `--context` flags override persisted defaults. Context inheritance is a
+sanitized semantic snapshot prepared by the parent, not native provider transcript cloning or
+prompt-cache reuse; Paseo's current `create_agent` API does not expose session cloning.
+
 Claude Code and Codex may expose installed skills as `/paseo-btw` instead of Pi's
 `/skill:paseo-btw` form.
 

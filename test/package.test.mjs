@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import { execFile } from "node:child_process";
 import test from "node:test";
+
+const execFileAsync = promisify(execFile);
 
 const packageJson = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -32,4 +39,51 @@ test("BTW flow is asynchronous, read-only, and same-workspace", () => {
   assert.match(skill, /\{ "kind": "btw" \}/);
   assert.match(skill, /list_profiles/);
   assert.match(skill, /create_agent/);
+  assert.match(skill, /PASEO_AGENT_ID/);
+  assert.match(skill, /get_agent_status/);
+  assert.match(skill, /portable semantic snapshot/);
+});
+
+test("configuration defaults to inheriting model and context", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pi-tools-test-"));
+  try {
+    const script = fileURLToPath(
+      new URL("../skills/paseo-btw/scripts/config.mjs", import.meta.url),
+    );
+    const env = { ...process.env, PI_TOOLS_CONFIG_HOME: root };
+
+    const initial = JSON.parse((await execFileAsync(process.execPath, [script, "show"], { env })).stdout);
+    assert.equal(initial.model, "inherit");
+    assert.equal(initial.context, "inherit");
+
+    const changed = JSON.parse(
+      (
+        await execFileAsync(
+          process.execPath,
+          [script, "set", "model", "claude/claude-haiku-4-5"],
+          { env },
+        )
+      ).stdout,
+    );
+    assert.equal(changed.model, "claude/claude-haiku-4-5");
+
+    const noContext = JSON.parse(
+      (
+        await execFileAsync(
+          process.execPath,
+          [script, "set", "context", "none"],
+          { env },
+        )
+      ).stdout,
+    );
+    assert.equal(noContext.context, "none");
+
+    const reset = JSON.parse(
+      (await execFileAsync(process.execPath, [script, "reset"], { env })).stdout,
+    );
+    assert.equal(reset.model, "inherit");
+    assert.equal(reset.context, "inherit");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
