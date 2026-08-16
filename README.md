@@ -8,9 +8,9 @@ Claude Code sessions launched by Paseo.
 
 ### `paseo-btw`
 
-Starts a lightweight, read-only side conversation without interrupting the main task. The side
-agent runs in the same Paseo workspace, appears in the Subagents track, and reports back through
-Paseo's normal completion notification.
+Starts a lightweight, read-only-by-contract side conversation without interrupting the main task.
+The side agent runs in the same Paseo workspace, appears in the Subagents track, and reports back
+through Paseo's normal completion notification.
 
 Examples:
 
@@ -20,21 +20,30 @@ Examples:
 /skill:paseo-btw --profile 低成本精修 explain this stack trace
 ```
 
-The child inherits the parent's Paseo provider/model, thinking setting, and a portable relevant
-context snapshot by default. Configure persistent defaults with:
+The child inherits the parent's Paseo provider/model, thinking setting, mode, feature values, and a
+bounded mechanical snapshot of the parent's Paseo text timeline by default. Configure persistent
+defaults with:
 
 ```text
 /skill:paseo-btw config
 /skill:paseo-btw config model inherit
 /skill:paseo-btw config model claude/claude-haiku-4-5
 /skill:paseo-btw config context inherit
+/skill:paseo-btw config context summary
 /skill:paseo-btw config context none
+/skill:paseo-btw config context-tail 40
+/skill:paseo-btw config context-max-chars 8000
 /skill:paseo-btw config reset
 ```
 
-One-off `--model` and `--context` flags override persisted defaults. Context inheritance is a
-sanitized semantic snapshot prepared by the parent, not native provider transcript cloning or
-prompt-cache reuse; Paseo's current `create_agent` API does not expose session cloning.
+One-off `--model` and `--context` flags override persisted defaults. `context: inherit` uses
+documented `paseo logs` output after removing the current turn, applying best-effort secret
+redaction, and enforcing a size limit. `context: summary` asks the parent to prepare a concise
+semantic snapshot; `context: none` sends no parent history.
+
+Paseo's app-level **Fork chat from here** also injects mechanically curated text into a new agent;
+it is not a provider-native session clone. Native Pi session forking remains a future opt-in mode
+and is deliberately not claimed by this release.
 
 Claude Code and Codex may expose installed skills as `/paseo-btw` instead of Pi's
 `/skill:paseo-btw` form.
