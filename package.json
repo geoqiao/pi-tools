@@ -1,0 +1,39 @@
+{
+  "name": "@geoqiao/pi-tools",
+  "version": "0.1.0",
+  "description": "Portable Paseo orchestration skills for Pi, Codex, and Claude Code.",
+  "type": "module",
+  "files": [
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "pi-package",
+    "agent-skills",
+    "paseo",
+    "pi",
+    "codex",
+    "claude-code"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/geoqiao/pi-tools.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ]
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "pack:check": "npm pack --dry-run"
+  }
+}
