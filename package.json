@@ -1,9 +1,11 @@
 {
   "name": "@geoqiao/pi-tools",
   "version": "0.1.0",
-  "description": "Portable Paseo orchestration skills for Pi, Codex, and Claude Code.",
+  "description": "Portable Paseo side-conversation commands and skills for Pi, Codex, and Claude Code.",
   "type": "module",
   "files": [
+    "bin",
+    "extensions",
     "skills",
     "README.md",
     "LICENSE"
@@ -28,9 +30,15 @@
     "node": ">=20"
   },
   "pi": {
+    "extensions": [
+      "./extensions/paseo-btw.ts"
+    ],
     "skills": [
       "./skills"
     ]
+  },
+  "bin": {
+    "paseo-btw": "./bin/paseo-btw.mjs"
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",

@@ -10,6 +10,11 @@ argument-hint: "[config ...] | [--model <inherit|provider/model>] [--context <in
 
 Create a small side conversation while the parent keeps its current task and context intact.
 
+This Skill is the model-mediated portability fallback. In a Paseo-managed Pi session, prefer
+`/btw <side question>`: the packaged extension command runs the launcher directly and therefore
+does not create a parent LLM turn. Claude Code and Codex do not expose Pi extension commands, so
+their Skill invocation necessarily leaves one orchestration turn in the parent transcript.
+
 **User's request:** $ARGUMENTS
 
 ## Defaults and configuration

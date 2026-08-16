@@ -1,18 +1,31 @@
 # pi-tools
 
-Portable [Agent Skills](https://agentskills.io/) for orchestrating coding agents through
-[Paseo](https://paseo.sh/). The same skill source is intended to work from Pi, Codex, and
-Claude Code sessions launched by Paseo.
+Portable Pi commands and [Agent Skills](https://agentskills.io/) for orchestrating coding agents
+through [Paseo](https://paseo.sh/).
 
-## Included skills
+## Included tools
 
-### `paseo-btw`
+### `/btw` and `paseo-btw`
 
-Starts a lightweight, read-only-by-contract side conversation without interrupting the main task.
-The side agent runs in the same Paseo workspace, appears in the Subagents track, and reports back
-through Paseo's normal completion notification.
+Starts a lightweight side conversation without interrupting the main task.
+The side agent runs in the same Paseo workspace and appears in the Subagents track.
 
-Examples:
+In Paseo's Pi provider, use the native extension command:
+
+```text
+/btw why might this API return 409?
+```
+
+The extension also registers the collision-free alias `/paseo-btw`. If another installed extension
+already owns `/btw`, Pi assigns numeric suffixes; use `/paseo-btw` or remove the conflicting package.
+
+`/btw` is handled before Pi starts an LLM turn. A packaged Node CLI reads the parent settings,
+captures inherited context when enabled, and calls `paseo run --background` directly. The text
+after `/btw` is passed unchanged as the side question, so the parent transcript gets no reasoning
+or tool-call loop.
+
+The Agent Skill remains a compatibility fallback for Codex, Claude Code, and clients that cannot
+load Pi extensions. It necessarily uses one parent model turn:
 
 ```text
 /skill:paseo-btw why might this API return 409?
@@ -20,33 +33,33 @@ Examples:
 /skill:paseo-btw --profile 低成本精修 explain this stack trace
 ```
 
-The child inherits the parent's Paseo provider/model, thinking setting, mode, feature values, and a
-bounded mechanical snapshot of the parent's Paseo text timeline by default. Configure persistent
-defaults with:
+The native command inherits the parent's Paseo provider/model and thinking setting plus a bounded
+mechanical snapshot of the parent's Paseo text timeline by default. The model-mediated Skill can
+also copy mode and feature values. Configure persistent defaults with:
 
 ```text
-/skill:paseo-btw config
-/skill:paseo-btw config model inherit
-/skill:paseo-btw config model claude/claude-haiku-4-5
-/skill:paseo-btw config context inherit
-/skill:paseo-btw config context summary
-/skill:paseo-btw config context none
-/skill:paseo-btw config context-tail 40
-/skill:paseo-btw config context-max-chars 8000
-/skill:paseo-btw config reset
+/btw-config
+/btw-config model inherit
+/btw-config model claude/claude-haiku-4-5
+/btw-config context inherit
+/btw-config context none
+/btw-config context-tail 40
+/btw-config context-max-chars 8000
+/btw-config reset
 ```
 
-One-off `--model` and `--context` flags override persisted defaults. `context: inherit` uses
-documented `paseo logs` output after removing the current turn, applying best-effort secret
-redaction, and enforcing a size limit. `context: summary` asks the parent to prepare a concise
-semantic snapshot; `context: none` sends no parent history.
+`context: inherit` uses documented `paseo logs` output after removing the current turn, applying
+best-effort secret redaction, and enforcing a size limit. `context: none` sends only the text after
+`/btw`. The legacy `summary` mode is available only through the model-mediated Agent Skill because
+creating a semantic summary requires a parent model turn. If mechanical capture is unavailable,
+the native command still launches with the side question alone and reports the fallback.
 
 Paseo's app-level **Fork chat from here** also injects mechanically curated text into a new agent;
 it is not a provider-native session clone. Native Pi session forking remains a future opt-in mode
 and is deliberately not claimed by this release.
 
-Claude Code and Codex may expose installed skills as `/paseo-btw` instead of Pi's
-`/skill:paseo-btw` form.
+Claude Code and Codex may expose the fallback Skill as `/paseo-btw` instead of Pi's
+`/skill:paseo-btw` form. They cannot provide Pi's zero-parent-turn extension command.
 
 ## Prerequisite
 
@@ -79,8 +92,8 @@ npx skills add /absolute/path/to/pi-tools --skill paseo-btw --agent '*' -g
 ```
 
 The npm package intentionally has no install-time script that mutates a user's agent
-configuration. npm distributes the files; Pi reads the `pi.skills` manifest, while other
-harnesses use the Agent Skills installer.
+configuration. npm distributes the files; Pi reads the `pi.extensions` and `pi.skills` manifests,
+while other harnesses use the Agent Skills installer.
 
 ## Development
 
@@ -90,5 +103,5 @@ npm run pack:check
 npx skills add . --list
 ```
 
-This repository is designed as a collection: more portable skills can be added under `skills/`
-without adding a runtime extension.
+This repository is designed as a collection: more portable commands and skills can be added
+without changing the BTW contract.
