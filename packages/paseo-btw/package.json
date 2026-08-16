@@ -1,0 +1,53 @@
+{
+  "name": "@geoqiao/paseo-btw",
+  "version": "0.0.0",
+  "description": "Portable Paseo side-conversation commands and skills for Pi, Codex, and Claude Code.",
+  "type": "module",
+  "files": [
+    "bin",
+    "extensions",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "pi-package",
+    "agent-skills",
+    "paseo",
+    "pi",
+    "codex",
+    "claude-code"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/geoqiao/pi-tools.git",
+    "directory": "packages/paseo-btw"
+  },
+  "homepage": "https://github.com/geoqiao/pi-tools/tree/main/packages/paseo-btw#readme",
+  "bugs": {
+    "url": "https://github.com/geoqiao/pi-tools/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/paseo-btw.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "bin": {
+    "paseo-btw": "./bin/paseo-btw.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "pack:check": "npm pack --dry-run"
+  }
+}

@@ -16,8 +16,10 @@ labels: [bug]
 
 ## Environment
 
-- pi-ask version:
+- Package (`@geoqiao/pi-ask` or `@geoqiao/paseo-btw`):
+- Package version:
 - pi version:
+- Paseo version (when relevant):
 - Terminal app:
 - OS:
 

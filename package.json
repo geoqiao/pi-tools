@@ -1,47 +1,33 @@
 {
-  "name": "@geoqiao/pi-tools",
-  "version": "0.1.0",
-  "description": "Portable Paseo side-conversation commands and skills for Pi, Codex, and Claude Code.",
-  "type": "module",
-  "files": [
-    "bin",
-    "extensions",
-    "skills",
-    "README.md",
-    "LICENSE"
-  ],
-  "keywords": [
-    "pi-package",
-    "agent-skills",
-    "paseo",
-    "pi",
-    "codex",
-    "claude-code"
-  ],
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/geoqiao/pi-tools.git"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "engines": {
-    "node": ">=20"
-  },
-  "pi": {
-    "extensions": [
-      "./extensions/paseo-btw.ts"
-    ],
-    "skills": [
-      "./skills"
-    ]
-  },
-  "bin": {
-    "paseo-btw": "./bin/paseo-btw.mjs"
-  },
+  "name": "@geoqiao/pi-tools-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Monorepo for independently published Pi packages.",
+  "packageManager": "pnpm@11.5.0",
   "scripts": {
-    "test": "node --test test/*.test.mjs",
-    "pack:check": "npm pack --dry-run"
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "format": "pnpm -r --if-present format",
+    "lint": "pnpm -r --if-present lint",
+    "check": "pnpm -r --if-present check",
+    "check:ci": "pnpm -r --if-present check:ci",
+    "pack:check": "pnpm -r --if-present pack:check",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish",
+    "commit": "cz"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.8",
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "commitizen": "^4.3.1",
+    "cz-conventional-changelog": "^3.3.0",
+    "lefthook": "^2.1.6"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
   }
 }

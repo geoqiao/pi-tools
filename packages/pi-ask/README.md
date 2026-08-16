@@ -3,9 +3,9 @@
 # @geoqiao/pi-ask
 
 [![npm downloads](https://badgen.net/npm/dm/@geoqiao/pi-ask)](https://www.npmjs.com/package/@geoqiao/pi-ask)
-[![CI](https://github.com/geoqiao/pi-ask/actions/workflows/ci.yml/badge.svg)](https://github.com/geoqiao/pi-ask/actions/workflows/ci.yml)
-[![last commit](https://badgen.net/github/last-commit/geoqiao/pi-ask)](https://github.com/geoqiao/pi-ask/commits/main)
-[![stars](https://badgen.net/github/stars/geoqiao/pi-ask)](https://github.com/geoqiao/pi-ask/stargazers)
+[![CI](https://github.com/geoqiao/pi-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/geoqiao/pi-tools/actions/workflows/ci.yml)
+[![last commit](https://badgen.net/github/last-commit/geoqiao/pi-tools)](https://github.com/geoqiao/pi-tools/commits/main)
+[![stars](https://badgen.net/github/stars/geoqiao/pi-tools)](https://github.com/geoqiao/pi-tools/stargazers)
 
 > [!IMPORTANT]
 > This is an independently maintained continuation of [`eko24ive/pi-ask`](https://github.com/eko24ive/pi-ask), with portable Pi RPC mode support while preserving the rich TUI experience.
@@ -20,18 +20,15 @@ High-quality video: [demo.mp4](https://github.com/user-attachments/assets/a8503c
 
 ## Upstream and contributions
 
-This project preserves the upstream Git history, MIT license, and author attribution. New development and releases are maintained independently in [`geoqiao/pi-ask`](https://github.com/geoqiao/pi-ask). Issues and contributions are welcome in this repository.
+This project preserves the upstream Git history, MIT license, and author attribution. New
+development and releases are maintained independently in the
+[`geoqiao/pi-tools`](https://github.com/geoqiao/pi-tools/tree/main/packages/pi-ask) monorepo. Issues
+and contributions are welcome there.
 
 ## Install
 
 ```bash
 pi install npm:@geoqiao/pi-ask
-```
-
-You can also install from git:
-
-```bash
-pi install git:github.com/geoqiao/pi-ask
 ```
 
 Or try it without installing (load once for the current run):
@@ -275,7 +272,7 @@ pnpm test
 
 ### Commit workflow
 
-This repo uses `lefthook`, Commitizen, conventional commitlint, and semantic-release.
+This monorepo uses `lefthook`, Commitizen, conventional commitlint, and Changesets.
 
 If you want local hooks, install them once after `pnpm install`:
 
@@ -283,11 +280,13 @@ If you want local hooks, install them once after `pnpm install`:
 pnpm exec lefthook install
 ```
 
-Recommended flow:
+From the repository root, the recommended flow is:
 
 ```bash
 pnpm commit
 ```
+
+User-facing changes should also include a Changeset created with `pnpm changeset`.
 
 ## Project layout
 

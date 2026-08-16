@@ -1,6 +1,6 @@
 pre-commit:
   jobs:
-    - run: npx ultracite fix
+    - run: pnpm --filter @geoqiao/pi-ask exec ultracite fix
       stage_fixed: true
 
 prepare-commit-msg:

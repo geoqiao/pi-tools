@@ -1,6 +1,6 @@
 name: Release
 
-# Trusted-publishing pipeline for @geoqiao/pi-ask.
+# Changesets release pipeline for independently versioned workspace packages.
 
 on:
   workflow_dispatch:
@@ -27,13 +27,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: main
           fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -41,6 +39,9 @@ jobs:
           node-version: lts/*
           cache: pnpm
           registry-url: https://registry.npmjs.org
+
+      - name: Update npm for trusted publishing
+        run: npm install --global npm@latest
 
       - name: Show tool versions
         run: |
@@ -51,9 +52,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Release
+      - name: Create release PR or publish packages
+        uses: changesets/action@v1
+        with:
+          version: pnpm version-packages
+          publish: pnpm release
+          title: "chore: release packages"
+          commit: "chore: release packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
           LEFTHOOK: 0
-        run: pnpm exec semantic-release

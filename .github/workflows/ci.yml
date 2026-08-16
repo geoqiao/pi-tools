@@ -1,6 +1,6 @@
 name: CI
 
-# Validation pipeline for the independently maintained package.
+# Validation pipeline for both independently published packages.
 
 on:
   workflow_dispatch:
@@ -19,8 +19,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -39,3 +37,6 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Package dry runs
+        run: pnpm pack:check

@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for contributing to `@geoqiao/pi-ask`.
+Thanks for contributing to the `pi-tools` monorepo.
 
 ## Development setup
 
@@ -10,10 +10,10 @@ Install dependencies:
 pnpm install
 ```
 
-Run the extension locally:
+Run pi-ask locally:
 
 ```bash
-pi -e ./src/index.ts
+pnpm --filter @geoqiao/pi-ask dev
 ```
 
 ## Contribution flow: chill mode
@@ -32,6 +32,7 @@ Before sharing a change set, please run:
 pnpm format
 pnpm typecheck
 pnpm test
+pnpm pack:check
 ```
 
 You can also run the repo-wide check:
@@ -42,7 +43,7 @@ pnpm check
 
 ## Commit messages
 
-This repo uses conventional commits and semantic-release.
+This repo uses conventional commits and Changesets.
 
 Recommended flow:
 
@@ -57,6 +58,8 @@ Examples:
 - `docs: clarify npm install flow`
 
 Conventional commit types matter because releases are generated automatically from commit history.
+
+For a user-facing package change, also run `pnpm changeset` and select only the affected package.
 
 ## Scope of changes
 
