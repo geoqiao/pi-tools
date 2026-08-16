@@ -19,6 +19,9 @@ const skill = await readFile(
 
 test("publishes paseo-btw through the Pi package manifest", () => {
   assert.equal(packageJson.name, "@geoqiao/paseo-btw");
+  assert.deepEqual(packageJson.bin, {
+    "paseo-btw": "bin/paseo-btw.mjs",
+  });
   assert.deepEqual(packageJson.pi.extensions, ["./extensions/paseo-btw.ts"]);
   assert.deepEqual(packageJson.pi.skills, ["./skills"]);
   assert.ok(packageJson.keywords.includes("pi-package"));

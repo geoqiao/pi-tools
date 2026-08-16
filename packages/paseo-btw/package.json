@@ -44,7 +44,7 @@
     ]
   },
   "bin": {
-    "paseo-btw": "./bin/paseo-btw.mjs"
+    "paseo-btw": "bin/paseo-btw.mjs"
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
