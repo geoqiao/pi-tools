@@ -254,6 +254,58 @@ test("normalize trims ids, prompts, and option text", () => {
 	});
 });
 
+test("normalize treats blank optional presentation text as absent", () => {
+	const state = createInitialState({
+		title: "   ",
+		questions: [
+			{
+				id: "scope",
+				label: "  ",
+				prompt: "Pick scope",
+				options: [
+					{
+						value: "small",
+						label: "Small",
+						description: " ",
+						preview: "\t",
+					},
+				],
+			},
+		],
+	});
+
+	assert.equal(state.title, undefined);
+	assert.equal(state.questions[0].label, "Q1");
+	assert.deepEqual(state.questions[0].options[0], {
+		value: "small",
+		label: "Small",
+		description: undefined,
+		preview: undefined,
+	});
+});
+
+test("normalization preserves recommendations without selecting them", () => {
+	const state = createInitialState({
+		questions: [
+			{
+				id: "scope",
+				prompt: "What scope?",
+				options: [
+					{ value: "small", label: "Small", recommended: true },
+					{ value: "medium", label: "Medium", recommended: false },
+					{ value: "large", label: "Large", recommended: true },
+				],
+			},
+		],
+	});
+
+	assert.deepEqual(
+		state.questions[0].options.map((option) => option.recommended),
+		[true, false, true]
+	);
+	assert.deepEqual(state.answers, {});
+});
+
 test("single-select number shortcut stores answer and advances to next tab", () => {
 	let state = createInitialState(sampleParams());
 	state = applyNumberShortcut(state, 2);

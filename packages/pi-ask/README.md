@@ -42,6 +42,7 @@ pi -e npm:@geoqiao/pi-ask
 Once installed, this package gives the agent a native way to ask for clarification instead of guessing. The rich interface is used in TUI mode.
 
 - 🧭 Familiar ask-style interface: tabbed questions, single/multi select, and preview mode
+- ⭐ Optional warning-colored `(recommended)` markers that do not preselect answers
 - ✍️ Inline free-form `Type your own` answers
 - 📎 Native pi-style `@` file references inside answer and note editors
 - 📝 Question-level and option-level notes
@@ -55,6 +56,7 @@ Once installed, this package gives the agent a native way to ask for clarificati
   - `/answer` extracts questions from the latest assistant message into an ask flow
   - `/answer:again` reopens the latest `/answer` form on the current branch
   - `/ask:replay` replays the latest real `ask_user` form on the current branch
+- 🛟 Automatic recovery of an unanswered `ask_user` form after startup, resume, or fork
 - 🗣️ You can talk to your agent to configure pi-ask; it will read the bundled configuration guide and tailor the config for you
 
 ## Feature walkthrough
@@ -192,7 +194,7 @@ Accepted notation follows pi-tui key ids. Common aliases are normalized, for exa
 
 After installation, the extension registers the `ask_user` tool plus `/ask-settings`, `/answer`, `/answer:again`, and `/ask:replay` commands.
 
-Agents can auto-discover and call `ask_user` when they need clarification instead of guessing. In interactive sessions, it opens a terminal UI flow for structured answers, supports native pi-style `@` file references while typing answers or notes, and returns normalized answers back to the agent. Ask settings are available both from `?` in the ask flow and from the `/ask-settings` command. Behaviour and notification settings are binary `on`/`off` toggles that save immediately when the config file is writable; save failures revert the toggle and show a manual-edit message. The settings overlay includes a guarded double-press reset-to-defaults action; keymaps, notification channels, and extraction settings are changed by editing the shown config file path.
+Agents can auto-discover and call `ask_user` when they need clarification instead of guessing. They can mark any number of grounded preferences with `recommended: true` and use option descriptions for reasons. In interactive sessions, it opens a terminal UI flow for structured answers, supports native pi-style `@` file references while typing answers or notes, and returns normalized answers back to the agent. Ask settings are available both from `?` in the ask flow and from the `/ask-settings` command. Behaviour and notification settings are binary `on`/`off` toggles that save immediately when the config file is writable; save failures revert the toggle and show a manual-edit message. The settings overlay includes a guarded double-press reset-to-defaults action; keymaps, notification channels, and extraction settings are changed by editing the shown config file path.
 
 ### Pi RPC fallback
 
@@ -202,7 +204,7 @@ When Pi runs in RPC mode with portable extension UI support, `ask_user` keeps th
 - selecting a real option and submitting advances directly to the next question or completes the flow
 - `Type something…` opens one `input` dialog; on multi questions it is the fallback for entering multiple choices
 - dismissing a question or its input skips that question instead of cancelling the flow
-- descriptions and preview content are flattened into readable option strings
+- recommendation markers, descriptions, and preview content are flattened into readable option strings without changing canonical values or labels
 - multiple questions include `[current/total]` progress in each dialog title
 - tool abort signals close portable `select`/`input` dialogs and return `cancelled: true`
 
@@ -210,7 +212,7 @@ RPC intentionally does not reproduce the tabbed same-screen form, native checkbo
 
 ### Answer and replay commands
 
-`/answer` is useful when the agent asked questions in plain text instead of using `ask_user`. It extracts questions from the latest completed assistant message and opens the same ask UI.
+`/answer` is useful when the agent asked questions in plain text instead of using `ask_user`. It supplies the preceding user message as context, asks the configured extraction model for one synthetic `ask_user` tool call, validates the result, and opens the same ask UI. Missing or invalid tool calls are retried; raw and fenced JSON text remain supported as fallbacks.
 
 Replay commands are branch-aware. They read persisted entries from the current pi session branch, so they work naturally with `/resume`, `/tree`, and conversation branching:
 
@@ -218,6 +220,12 @@ Replay commands are branch-aware. They read persisted entries from the current p
 - `/ask:replay` reopens the latest real `ask_user` form on this branch
 
 Cancellation is local to the UI: closing a replayed form does not start a new agent turn. Submitted answers are sent back as a normal user follow-up message.
+
+### Interrupted ask forms
+
+If Pi stops while an `ask_user` form is open, the tool call remains without a result. Starting, resuming, or forking that session reopens the newest unanswered form once. Submitting sends the result as a user message because the original tool execution no longer exists. Cancelling dismisses the automatic recovery. Either outcome prevents another automatic reopen, while `/ask:replay` remains available.
+
+New sessions, extension reloads, non-TUI modes, and RPC sessions do not trigger recovery.
 
 Kudos to [@k0valik](https://github.com/k0valik) for the `/answer` idea.
 

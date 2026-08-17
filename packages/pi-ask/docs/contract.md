@@ -20,6 +20,7 @@ This document defines the stable external behavior. It does not explain internal
       label: string;
       description?: string;
       preview?: string;
+      recommended?: boolean;
     }>;
   }>;
 }
@@ -32,8 +33,11 @@ This document defines the stable external behavior. It does not explain internal
 - every question must have at least one option
 - question ids must be unique within one tool call
 - option `value`s must be unique within a question
-- optional `label`, `description`, and `preview` fields must not be blank when provided
-- `label` falls back to `Q1`, `Q2`, ...
+- blank optional `title`, question `label`, option `description`, and option `preview` fields are treated as omitted
+- question `label` falls back to `Q1`, `Q2`, ...
+- option `label` is required in the public schema; before schema validation, a missing or blank string label is derived from a non-empty `value` by replacing hyphens and underscores with spaces and capitalizing the first character
+- `recommended` is optional presentation metadata; zero, one, or multiple options may set it to `true`
+- recommended options render warning-colored `(recommended)` followed by muted ` | <description>`, or only `(recommended)` when no description exists, but are not preselected
 - `type` defaults to `single`
 - `required` defaults to `false`
 - `required` is metadata only; it never blocks submission
@@ -106,6 +110,7 @@ This document defines the stable external behavior. It does not explain internal
                 label: string;
                 description?: string;
                 preview?: string;
+                recommended?: boolean;
               }>;
             };
             answered: boolean;
@@ -132,6 +137,7 @@ This document defines the stable external behavior. It does not explain internal
                 label: string;
                 description?: string;
                 preview?: string;
+                recommended?: boolean;
               }>;
             };
             option: {
@@ -139,6 +145,7 @@ This document defines the stable external behavior. It does not explain internal
               label: string;
               description?: string;
               preview?: string;
+              recommended?: boolean;
             };
             selected: boolean;
             answered: boolean;
@@ -161,15 +168,17 @@ This document defines the stable external behavior. It does not explain internal
 ## Output rules
 
 - `cancelled: true` means the user dismissed a flow-level selection, chose Cancel, aborted the flow, UI was unavailable, or the payload was invalid before UI opened
-- invalid payloads return `error.kind === "invalid_input"` with structured `issues` and a transcript-friendly `Invalid ask_user payload:` message
+- semantically invalid payloads that reach tool execution return `error.kind === "invalid_input"` with structured `issues` and a transcript-friendly `Invalid ask_user payload:` message; their rendered status is `Invalid tool payload`
+- payloads missing schema-required fields fail Pi's schema validation before tool execution and use Pi's standard tool-error result without structured `details`
 - `mode: "submit"` is normal completion; `mode: "elaborate"` means the user asked the agent to continue with follow-up clarification based on notes
-- unanswered questions are omitted from `answers`
+- unanswered questions without notes are omitted from `answers`; note-only entries remain in `answers` to carry their notes, but all non-cancelled submitted result text includes `<label>: (no answer)` in summary mode and `? <label>: (no answer)` in transcript rendering
 - in `mode: "elaborate"`, `answers` contains only committed answers; note-only entries move to `elaboration.items`
 - `continuation.strategy === "refine_only"` means the next ask should refine the current flow rather than restart it
 - `continuation.preservedAnswers` contains previously committed answers that should be kept as context and not re-asked
 - `continuation.affectedQuestionIds` lists the only questions that should be revisited
 - `continuation.questionStates` marks each question as `answered`, `needs_clarification`, or `unanswered`
 - single-select answers still use arrays
+- recommendation markers never change canonical submitted labels or values
 - when `behaviour.presentSingleAsMulti` is enabled, requested single-select questions are presented and handled as multi-select in future/replayed ask flows; result question metadata keeps the requested `type`, adds `presentedType` when final presentation differs, and result text uses one compact note when any answered questions were presented differently
 - `indices` are 1-based rendered option positions
 - `customText` stores the free-form answer
@@ -197,6 +206,7 @@ This document defines the stable external behavior. It does not explain internal
 
 - tabbed multi-question flow
 - single-select, multi-select, and preview questions
+- optional warning-colored recommendation subtitles in standard and preview option lists without automatic selection
 - active question type changes via configurable `main.changeQuestionType` hotkey, default `t`; non-preview questions toggle `single <-> multi`; preview questions toggle `preview <-> multi`
 - inline free-form answers for all question types
 - native pi-style `@` file path autocomplete inside free-form answer and note editors
@@ -207,10 +217,11 @@ This document defines the stable external behavior. It does not explain internal
 - on the review tab, `Submit` and `Cancel` preview notes only for answered questions
 - on the review tab, `Elaborate` preview expands to all question notes and all option notes, including notes on unselected options
 - transcript-friendly call and result rendering
-- `/answer` command to extract a raw-JSON `AskParams` form from the latest completed assistant message and open the ask UI
+- `/answer` command to convert the latest completed assistant message into an `AskParams` form through a synthetic `ask_user` tool call and open the ask UI
 - `/answer` extraction may use an internal `freeform: true` option for open-ended questions with no explicit choices; these render as user-input-only questions with the label `Type your answer:`, no numbered option row, and no selection caret; this marker is not part of the public `ask_user` tool contract
 - `/answer:again` command to replay the latest `/answer`-extracted form on the current branch
 - `/ask:replay` command to replay the latest real `ask_user` form on the current branch
+- automatic recovery of the newest unresolved `ask_user` form on startup, resume, or fork
 - ask settings list with binary behaviour/notification toggles and a guarded reset-to-defaults action
 - `?` in the ask flow and `/ask-settings` in pi open the same lightweight ask settings overlay
 - settings attempt to persist immediately when changed: `Auto-submit when answered without notes`, `Confirm dismiss when dirty`, `Double-press review shortcuts`, `Notifications`, and `Show footer hints`; `Present single-select as multi-select` persists immediately when saving succeeds but applies only to new/replayed ask flows; save failures revert the setting and show a manual-edit message; resetting config to defaults requires pressing the reset action twice within a short confirmation window
@@ -263,7 +274,7 @@ The rich ask flow uses `ctx.ui.custom()` only in TUI mode. RPC mode never calls 
 - selecting and submitting a real option advances directly; no confirmation, notes, review, or continuation card follows it
 - `Type something…` opens one `input` dialog and serializes the entered text through the existing `customText`, `values`, `labels`, and `indices` result fields
 - RPC does not emulate native multi-select: choosing one real option records that option, while `Type something…` lets the user enter multiple choices as free-form text
-- descriptions and preview content are flattened into option strings instead of using a custom preview pane
+- recommendation markers, descriptions, and preview content are flattened into option strings instead of using a custom preview pane; display text never changes canonical labels or values
 - multiple questions are sequential and every title includes `[current/total]` progress
 - dismissing a question card or its custom input skips that question; a dismissed required question is also left unanswered because required remains advisory
 - RPC does not add Skip or Cancel rows because the portable client's native Dismiss control already provides the skip behavior
@@ -273,7 +284,7 @@ RPC does not provide the tabbed same-screen form, native checkbox cards, repeate
 
 In print, JSON, other non-TUI modes, or RPC without portable UI availability, the tool returns a `Needs user input: ask_user requires interactive TUI mode.` message in `content` and a cancelled result in `details` instead of opening UI.
 
-Validation is handled inside the tool so malformed calls produce the same structured error shape as other invalid payloads instead of relying on pre-execution schema failures.
+The public tool schema requires question `id` and `prompt` plus option `value` and `label`, and restricts question `type` to `single`, `multi`, or `preview`, so malformed structural fields fail before execution. The tool still validates trimmed text, uniqueness, option counts, and preview requirements during execution and returns structured issues for those failures. Result rendering falls back to Pi's raw tool-error text when schema validation prevents execution.
 
 The ask flow subscribes to runtime settings updates while open. In practice, this means changing `Auto-submit when answered without notes`, `Confirm dismiss when dirty`, `Double-press review shortcuts`, `Notifications`, `Show footer hints`, resetting config to defaults, or reloading config-backed keymaps can affect the in-progress ask flow immediately instead of only future asks when the change is saved or otherwise applied in memory. Load-time migrations and invalid config handling do not rewrite, rename, or back up the config file; invalid files load defaults for the session and show a notice. `Present single-select as multi-select` is applied when an ask flow is created and does not rewrite question semantics for an already-open flow; use `main.changeQuestionType` for live per-question changes.
 
@@ -287,12 +298,10 @@ pi-ask exposes a local `pi.events` contract for trusted Pi extensions. It does n
 
 Channels:
 
-The established event namespace is retained for compatibility with existing trusted integrations.
-
-- `@eko24ive/pi-ask:started`
-- `@eko24ive/pi-ask:completed`
-- `@eko24ive/pi-ask:submit`
-- `@eko24ive/pi-ask:submit-result`
+- `@geoqiao/pi-ask:started`
+- `@geoqiao/pi-ask:completed`
+- `@geoqiao/pi-ask:submit`
+- `@geoqiao/pi-ask:submit-result`
 
 Remote submissions must be explicit `{ kind: "answer" }` or `{ kind: "cancel" }` responses. Remote answers use question ids and normalized option values from the started event. pi-ask validates ids and values, recomputes labels/indices, and does not infer approval semantics from labels. The normal `ask_user` tool uses the portable-dialog fallback in RPC; the event bridge remains available for other trusted in-process integrations.
 
@@ -302,11 +311,22 @@ See [`remote-events.md`](remote-events.md) for payload shapes, examples, and a l
 
 - valid `ask_user` payloads are persisted as branch custom entries before the UI opens, so `/ask:replay` can reopen them after cancel, `/resume`, or `/tree`
 - `/answer` scans the current branch for the latest assistant message; if that message did not finish with `stop`, extraction is refused
-- `/answer` expects the extractor to return raw JSON only; JSON parse failures are retried according to `answer.extractionRetries`, then reported to the user without opening the ask UI
+- `/answer` sends the preceding user message as context with the latest assistant text and asks the extractor for one synthetic `ask_user` tool call
+- missing or invalid tool calls are retried according to `answer.extractionRetries`; raw or fenced JSON text remains supported as a last-resort fallback
 - `{ "questions": [] }` from extraction means no questions were found and is not treated as an invalid ask payload
 - command-flow cancellation closes with a notification and does not send a message to the agent
 - submitted or elaborated command-flow results are sent back with user-message semantics
 - replay commands scan only `ctx.sessionManager.getBranch()`, ignore sibling/future branch payloads, and revalidate stored payloads before opening the UI
+
+## Interrupted ask resume
+
+- on `session_start` with reason `startup`, `resume`, or `fork`, pi-ask finds the newest `ask_user` tool call on the active branch that has neither a tool result nor an `ask:pending-dismissed` entry
+- recovery does not run for `new`, `reload`, non-TUI, or RPC sessions
+- the matching valid `ask:payload` supplies the form; if it is missing or invalid, pi-ask validates and uses the original tool call arguments instead
+- the recovery flow is detached from `session_start`, so an open form does not block other lifecycle handlers
+- because the interrupted `execute` promise no longer exists, submit sends the result with the same user-message semantics as replay commands
+- submit and cancel both append `ask:pending-dismissed`, which prevents another automatic reopen; `/ask:replay` still works
+- recovered flows emit remote lifecycle events with source `ask:resume`
 
 The non-interactive fallback message includes normalized pending questions and options so the caller can re-ask them manually. `details.questions` still contains normalized question metadata, while `details.answers` stays empty until a user responds.
 

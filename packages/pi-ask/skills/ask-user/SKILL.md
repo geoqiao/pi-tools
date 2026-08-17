@@ -92,6 +92,8 @@ After attempt 2:
 - Avoid defaulting mechanically; infer from whether options are mutually exclusive, can coexist, or need preview-pane detail.
 - Keep option labels short and outcome-oriented.
 - Include trade-off descriptions when non-obvious.
+- Include a stable question `id`, non-empty `prompt`, and a non-empty `value` and visible `label` for every option.
+- Mark grounded preferences with `recommended: true` and explain the reason in `description`; recommendations are presentation-only and never preselected.
 - For research/planning, ask about goals, constraints, evaluation criteria, audience, budget, timeline, risk tolerance, and desired output only when they materially affect the result.
 - Prefer non-`preview` questions when a free-form answer may be useful, since those include an internal `Type your own` option.
 

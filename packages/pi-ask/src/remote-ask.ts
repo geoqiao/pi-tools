@@ -7,12 +7,17 @@ import type {
 	AskStateAnswer,
 } from "./types.ts";
 
-export const PI_ASK_STARTED_EVENT = "@eko24ive/pi-ask:started";
-export const PI_ASK_COMPLETED_EVENT = "@eko24ive/pi-ask:completed";
-export const PI_ASK_SUBMIT_EVENT = "@eko24ive/pi-ask:submit";
-export const PI_ASK_SUBMIT_RESULT_EVENT = "@eko24ive/pi-ask:submit-result";
+export const PI_ASK_STARTED_EVENT = "@geoqiao/pi-ask:started";
+export const PI_ASK_COMPLETED_EVENT = "@geoqiao/pi-ask:completed";
+export const PI_ASK_SUBMIT_EVENT = "@geoqiao/pi-ask:submit";
+export const PI_ASK_SUBMIT_RESULT_EVENT = "@geoqiao/pi-ask:submit-result";
 
-export type RemoteAskSource = "tool" | "answer" | "answer:again" | "ask:replay";
+export type RemoteAskSource =
+	| "tool"
+	| "answer"
+	| "answer:again"
+	| "ask:replay"
+	| "ask:resume";
 
 export interface RemoteAskAnswer {
 	customText?: string;
