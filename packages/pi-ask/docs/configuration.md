@@ -101,8 +101,9 @@ These settings affect only the `/answer` command. Normal `ask_user` tool calls d
 
 - type: array of `{ "provider": string, "id": string }`
 - default: lightweight OpenAI Codex, GitHub Copilot, and Anthropic models
-- effect: `/answer` tries configured models in order and uses the first model with available auth
-- fallback: if no configured model is usable, `/answer` tries the current chat model after validating its auth
+- effect: `/answer` tries configured models in order and uses the first model with available auth that is inside the current session model scope; an empty scope allows all available models
+- fallback: if no configured model is usable, `/answer` tries the current chat model after validating its auth and scope
+- auth check: use Pi's auth preflight before changing this list: `pi auth check --provider <provider> --model <id>`
 
 ### `answer.extractionTimeoutMs`
 
@@ -114,7 +115,7 @@ These settings affect only the `/answer` command. Normal `ask_user` tool calls d
 
 - type: integer from `0` to `3`
 - default: `1`
-- effect: number of retry attempts after raw JSON parsing fails; retries include the parse error and previous response as feedback
+- effect: number of retry attempts after the model omits `ask_user`, returns invalid tool arguments, or produces an invalid JSON text fallback; retries include the previous error and response as feedback
 
 ## Behaviour
 

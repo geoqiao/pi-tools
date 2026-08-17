@@ -8,13 +8,13 @@ Use this for local bridges: status cards, desktop helpers, or approval UIs. Do n
 
 Lifecycle:
 
-- `@eko24ive/pi-ask:started`
-- `@eko24ive/pi-ask:completed`
+- `@geoqiao/pi-ask:started`
+- `@geoqiao/pi-ask:completed`
 
 Remote submit:
 
-- `@eko24ive/pi-ask:submit`
-- `@eko24ive/pi-ask:submit-result`
+- `@geoqiao/pi-ask:submit`
+- `@geoqiao/pi-ask:submit-result`
 
 ## Started
 
@@ -25,19 +25,19 @@ type PiAskStartedEvent = {
   version: 1;
   flowId: string;
   toolCallId?: string;
-  source: "tool" | "answer" | "answer:again" | "ask:replay";
+  source: "tool" | "answer" | "answer:again" | "ask:replay" | "ask:resume";
   title?: string;
   questions: AskQuestion[];
   createdAt: number;
 };
 ```
 
-Use `flowId` for submit/correlation. Use `questions[].id` and `questions[].options[].value` for answers.
+Use `flowId` for submit/correlation. Use `questions[].id` and `questions[].options[].value` for answers. `ask:resume` identifies a form recovered from an interrupted tool call. Started-event options preserve the optional `recommended` boolean as presentation metadata only.
 
 ## Submit an answer
 
 ```ts
-pi.events.emit("@eko24ive/pi-ask:submit", {
+pi.events.emit("@geoqiao/pi-ask:submit", {
   version: 1,
   requestId: `bridge-${Date.now()}`,
   flowId,
@@ -73,7 +73,7 @@ Rules:
 ## Cancel
 
 ```ts
-pi.events.emit("@eko24ive/pi-ask:submit", {
+pi.events.emit("@geoqiao/pi-ask:submit", {
   version: 1,
   requestId: `bridge-${Date.now()}`,
   flowId,
@@ -111,7 +111,7 @@ type PiAskCompletedEvent = {
   version: 1;
   flowId: string;
   toolCallId?: string;
-  source: "tool" | "answer" | "answer:again" | "ask:replay";
+  source: "tool" | "answer" | "answer:again" | "ask:replay" | "ask:resume";
   result: AskResult;
   completedAt: number;
 };
@@ -121,11 +121,11 @@ type PiAskCompletedEvent = {
 
 ```ts
 export default function piAskBridge(pi: any) {
-  pi.events.on("@eko24ive/pi-ask:started", (event: any) => {
+  pi.events.on("@geoqiao/pi-ask:started", (event: any) => {
     const question = event.questions[0];
     const option = question.options[0];
 
-    pi.events.emit("@eko24ive/pi-ask:submit", {
+    pi.events.emit("@geoqiao/pi-ask:submit", {
       version: 1,
       requestId: `bridge-${Date.now()}`,
       flowId: event.flowId,
@@ -138,7 +138,7 @@ export default function piAskBridge(pi: any) {
     });
   });
 
-  pi.events.on("@eko24ive/pi-ask:submit-result", (event: any) => {
+  pi.events.on("@geoqiao/pi-ask:submit-result", (event: any) => {
     if (!event.ok) console.error(event.error, event.message);
   });
 }
@@ -153,10 +153,10 @@ Create a temporary bridge and run pi with only this repo extension plus the brid
 ```bash
 cat > /tmp/pi-ask-smoke.ts <<'EOF'
 export default function smoke(pi: any) {
-  pi.events.on("@eko24ive/pi-ask:started", (event: any) => {
+  pi.events.on("@geoqiao/pi-ask:started", (event: any) => {
     const q = event.questions[0];
     setTimeout(() => {
-      pi.events.emit("@eko24ive/pi-ask:submit", {
+      pi.events.emit("@geoqiao/pi-ask:submit", {
         version: 1,
         requestId: `smoke-${Date.now()}`,
         flowId: event.flowId,
