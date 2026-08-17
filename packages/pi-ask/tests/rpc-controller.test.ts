@@ -188,6 +188,37 @@ test("RPC preview flattens readable option details without extra cards", async (
 	harness.assertDrained();
 });
 
+test("RPC marks recommendations without changing canonical answers", async () => {
+	const harness = new RpcDialogHarness([pickOption("recommended")]);
+	const state = createInitialState(
+		params([
+			{
+				id: "scope",
+				prompt: "Choose scope",
+				options: [
+					{
+						value: "small",
+						label: "Small",
+						description: "Lowest risk",
+						recommended: true,
+					},
+					{ value: "large", label: "Large" },
+				],
+			},
+		])
+	);
+
+	const result = await runRpcAskFlow(harness.ctx, state);
+
+	assert.equal(
+		harness.selectCalls[0]?.options[0],
+		"1. Small (recommended) — Lowest risk"
+	);
+	assert.deepEqual(result.answers.scope?.values, ["small"]);
+	assert.deepEqual(result.answers.scope?.labels, ["Small"]);
+	harness.assertDrained();
+});
+
 test("RPC multiple questions advance directly after each submitted choice", async () => {
 	const harness = new RpcDialogHarness([
 		pickOption("1. Small"),

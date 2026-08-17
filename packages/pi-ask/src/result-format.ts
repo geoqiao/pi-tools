@@ -13,13 +13,14 @@ export function formatResultLines(
 	for (const question of result.questions) {
 		const answer = result.answers[question.id];
 		if (!answer) {
+			lines.push(formatUnansweredLine(question.label, options.mode));
 			continue;
 		}
 
 		const answerLine = formatAnswerLine(question.label, answer, options.mode);
-		if (answerLine) {
-			lines.push(answerLine);
-		}
+		lines.push(
+			answerLine ?? formatUnansweredLine(question.label, options.mode)
+		);
 
 		if (hasPresentedTypeOverride(question.type, question.presentedType)) {
 			hasPresentationOverride = true;
@@ -42,6 +43,15 @@ export function formatResultLines(
 	}
 
 	return lines;
+}
+
+function formatUnansweredLine(
+	questionLabel: string,
+	mode: "summary" | "render"
+): string {
+	return mode === "summary"
+		? `${questionLabel}: (no answer)`
+		: `? ${questionLabel}: (no answer)`;
 }
 
 function formatAnswerLine(

@@ -247,13 +247,14 @@ function formatTitle(
 }
 
 function formatOption(option: AskDisplayOption, optionIndex: number): string {
+	const recommendation = option.recommended ? " (recommended)" : "";
 	const description = option.description
 		? ` — ${compactText(option.description)}`
 		: "";
 	const preview = option.preview
 		? ` — Preview: ${compactText(option.preview)}`
 		: "";
-	return `${optionIndex + 1}. ${compactText(option.label)}${description}${preview}`;
+	return `${optionIndex + 1}. ${compactText(option.label)}${recommendation}${description}${preview}`;
 }
 
 function compactText(value: string): string {

@@ -2,7 +2,9 @@ import type {
 	ExtensionAPI,
 	ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { Value } from "typebox/value";
 import { validateParams } from "./ask-tool-helpers.ts";
+import { AskParamsSchema } from "./schema.ts";
 import type { AskParams } from "./types.ts";
 
 export const ASK_PAYLOAD_ENTRY_TYPE = "ask:payload";
@@ -50,6 +52,26 @@ export function findLatestPayloadInCurrentBranch(
 	return { invalidMatchFound };
 }
 
+export function findPayloadForSourceEntry(
+	ctx: Pick<ExtensionContext, "sessionManager">,
+	sourceEntryId: string,
+	source: AskPayloadSource
+): AskPayloadEntryData | undefined {
+	for (const entry of [...ctx.sessionManager.getBranch()].reverse()) {
+		if (!isAskPayloadEntry(entry)) {
+			continue;
+		}
+		const data = entry.data;
+		if (data?.source !== source || data.sourceEntryId !== sourceEntryId) {
+			continue;
+		}
+		if (isValidAskPayloadData(data)) {
+			return data;
+		}
+	}
+	return;
+}
+
 function isAskPayloadEntry(entry: unknown): entry is {
 	customType: string;
 	data?: Partial<AskPayloadEntryData>;
@@ -75,7 +97,7 @@ function isValidAskPayloadData(data: unknown): data is AskPayloadEntryData {
 		return false;
 	}
 	if (
-		!payload.params ||
+		!Value.Check(AskParamsSchema, payload.params) ||
 		validateParams(payload.params, {
 			allowFreeform: payload.source === "answer-extraction",
 		}).ok === false

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { Value } from "typebox/value";
 import { registerAskTool } from "../src/ask-tool.ts";
+import { AskOptionSchema, AskParamsSchema } from "../src/schema.ts";
 import type { AskParams } from "../src/types.ts";
 
 const NON_INTERACTIVE_MESSAGE_RE =
@@ -37,6 +39,9 @@ function registerMockTool() {
 		entries,
 		tool: tools[0] as {
 			execute: (...args: any[]) => Promise<any>;
+			parameters: Record<string, any>;
+			prepareArguments: (args: unknown) => unknown;
+			promptGuidelines: string[];
 			renderCall: (args: unknown, theme: any) => { text: string };
 			renderResult: (
 				result: any,
@@ -46,6 +51,43 @@ function registerMockTool() {
 		},
 	};
 }
+
+test("ask option schema and tool guidance support grounded recommendations", () => {
+	const { tool } = registerMockTool();
+
+	assert.equal(
+		Value.Check(AskOptionSchema, {
+			value: "small",
+			label: "Small",
+			description: "Lowest implementation risk",
+			recommended: true,
+		}),
+		true
+	);
+	assert(
+		tool.promptGuidelines.some(
+			(guideline) =>
+				guideline.includes("grounded preferences") &&
+				guideline.includes("description")
+		)
+	);
+});
+
+test("ask params schema constrains question types", () => {
+	assert.equal(
+		Value.Check(AskParamsSchema, {
+			questions: [
+				{
+					id: "layout",
+					prompt: "Choose a layout",
+					type: "grid",
+					options: [{ value: "compact", label: "Compact" }],
+				},
+			],
+		}),
+		false
+	);
+});
 
 function makeCtx(hasUi: boolean, mode = hasUi ? "tui" : "print"): unknown {
 	return { [HAS_UI]: hasUi, mode };
@@ -361,7 +403,7 @@ test("ask tool reports preview validation with structured issues", async () => {
 					id: "layout",
 					prompt: "Pick layout",
 					type: "preview",
-					options: [{ value: "compact", label: "Compact" }],
+					options: [{ value: "compact", label: "Compact", preview: "   " }],
 				},
 			],
 		},
@@ -382,6 +424,98 @@ test("ask tool reports preview validation with structured issues", async () => {
 		],
 	});
 	assert.match(result.content[0].text, PREVIEW_RULE_RE);
+});
+
+test("ask tool accepts blank optional presentation fields", async () => {
+	const { tool } = registerMockTool();
+	const params: AskParams = {
+		title: "   ",
+		questions: [
+			{
+				id: "scope",
+				label: "  ",
+				prompt: "Pick scope",
+				options: [
+					{
+						value: "small",
+						label: "Small",
+						description: " ",
+						preview: "\t",
+					},
+				],
+			},
+		],
+	};
+	assert.equal(Value.Check(AskParamsSchema, params), true);
+	const result = await tool.execute(
+		"call-blank-optionals",
+		params,
+		undefined,
+		noop,
+		makeCtx(false)
+	);
+
+	assert.equal(result.details.error, undefined);
+	assert.equal(result.details.title, undefined);
+	assert.equal(result.details.questions[0].label, "Q1");
+});
+
+test("ask tool prepares missing and blank option labels before schema validation", async () => {
+	const { tool } = registerMockTool();
+	const raw = {
+		questions: [
+			{
+				id: "encryption",
+				prompt: "Choose encryption",
+				options: [
+					{ value: "region-local-kms-reencrypt-dek" },
+					{ value: "follow_up", label: "  " },
+					{ value: "existing", label: "Existing label" },
+				],
+			},
+		],
+	};
+
+	assert.equal(Value.Check(AskParamsSchema, raw), false);
+	const prepared = tool.prepareArguments(raw) as AskParams;
+	assert.equal(Value.Check(AskParamsSchema, prepared), true);
+	assert.deepEqual(
+		prepared.questions[0]?.options.map((option) => option.label),
+		["Region local kms reencrypt dek", "Follow up", "Existing label"]
+	);
+
+	const result = await tool.execute(
+		"call-prepared-labels",
+		prepared,
+		undefined,
+		noop,
+		makeCtx(false)
+	);
+	assert.equal(result.details.error, undefined);
+});
+
+test("public schema requires semantic identifiers and labels", () => {
+	const { tool } = registerMockTool();
+	assert.deepEqual(tool.parameters.required, ["questions"]);
+	const questionSchema = tool.parameters.properties.questions.items;
+	assert.deepEqual(questionSchema.required, ["id", "prompt", "options"]);
+	assert.deepEqual(questionSchema.properties.options.items.required, [
+		"value",
+		"label",
+	]);
+
+	assert.equal(
+		Value.Check(AskParamsSchema, {
+			questions: [
+				{
+					id: "scope",
+					prompt: "Pick scope",
+					options: [{ value: "small" }],
+				},
+			],
+		}),
+		false
+	);
 });
 
 test("ask tool transcript renderers summarize call and cancelled result", () => {
@@ -434,5 +568,23 @@ test("ask tool transcript renderers summarize call and cancelled result", () => 
 		undefined,
 		theme
 	).text;
-	assert.equal(invalidText, "Invalid input");
+	assert.equal(invalidText, "Invalid tool payload");
+
+	const schemaErrorText = tool.renderResult(
+		{
+			content: [
+				{
+					type: "text",
+					text: 'Validation failed for tool "ask_user": missing label',
+				},
+			],
+			details: {},
+		},
+		undefined,
+		theme
+	).text;
+	assert.equal(
+		schemaErrorText,
+		'Validation failed for tool "ask_user": missing label'
+	);
 });

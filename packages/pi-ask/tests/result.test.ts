@@ -5,6 +5,7 @@ import { createInitialState } from "../src/state/create.ts";
 import { summarizeResult, toAskResult } from "../src/state/result.ts";
 import {
 	applyNumberShortcut,
+	confirmCurrentSelection,
 	enterOptionNoteMode,
 	enterQuestionNoteMode,
 	moveOption,
@@ -34,6 +35,71 @@ test("summarizeResult formats selected answers", () => {
 
 	assert.equal(summarizeResult(result), "Style: Rich");
 	assert.equal(renderResultText(result), "✓ Style: Rich");
+});
+
+test("submitted results surface unanswered questions without serializing answers", () => {
+	let state = createInitialState({
+		questions: [
+			{
+				id: "architecture",
+				label: "Architecture",
+				prompt: "How should we wire secrets?",
+				options: [{ value: "encrypted", label: "Encrypted" }],
+			},
+			{
+				id: "sources",
+				label: "Secret sources",
+				prompt: "Where do secrets come from?",
+				type: "multi",
+				options: [{ value: "env", label: ".env file" }],
+			},
+		],
+	});
+
+	state = applyNumberShortcut(state, 1);
+	state = confirmCurrentSelection(state);
+	state = confirmCurrentSelection(state);
+	const result = toAskResult(state);
+
+	assert.equal(result.answers.sources, undefined);
+	assert.equal(
+		summarizeResult(result),
+		"Architecture: Encrypted\nSecret sources: (no answer)"
+	);
+	assert.equal(
+		renderResultText(result),
+		"✓ Architecture: Encrypted\n? Secret sources: (no answer)"
+	);
+});
+
+test("submitted results surface every question when all are unanswered", () => {
+	const result = {
+		cancelled: false,
+		mode: "submit" as const,
+		questions: [
+			{
+				id: "scope",
+				label: "Scope",
+				prompt: "What scope?",
+				type: "single" as const,
+			},
+			{
+				id: "tests",
+				label: "Tests",
+				prompt: "Which tests?",
+				type: "multi" as const,
+			},
+		],
+		answers: {},
+	};
+	assert.equal(
+		summarizeResult(result),
+		"Scope: (no answer)\nTests: (no answer)"
+	);
+	assert.equal(
+		renderResultText(result),
+		"? Scope: (no answer)\n? Tests: (no answer)"
+	);
 });
 
 test("single questions presented as multi preserve requested type in results", () => {
@@ -277,7 +343,14 @@ test("question-note-only results still render note content", () => {
 		},
 	};
 
-	assert.equal(renderResultText(result), "  note: Prefer incremental changes");
+	assert.equal(
+		renderResultText(result),
+		"? Scope: (no answer)\n  note: Prefer incremental changes"
+	);
+	assert.equal(
+		summarizeResult(result),
+		"Scope: (no answer)\nScope note: Prefer incremental changes"
+	);
 });
 
 test("elaborate results include unselected notes in summary and render output", () => {
@@ -568,7 +641,30 @@ test("elaborate continuation preserves unrelated committed answers", () => {
 	});
 });
 
-test("invalid input result renders as invalid input", () => {
+test("elaboration preserves recommendation metadata", () => {
+	let state = createInitialState({
+		questions: [
+			{
+				id: "framework",
+				label: "Framework",
+				prompt: "Pick a framework",
+				options: [{ value: "react", label: "React", recommended: true }],
+			},
+		],
+	});
+	state = enterOptionNoteMode(state, "framework", "react");
+	state = saveNote(state, "Explain this preference");
+	state = { ...state, mode: "elaborate" };
+
+	const item = toAskResult(state).elaboration?.items[0];
+	assert.equal(item?.question.options[0]?.recommended, true);
+	assert.equal(
+		item && "option" in item ? item.option.recommended : undefined,
+		true
+	);
+});
+
+test("invalid tool payload result is attributed to the tool call", () => {
 	const result = {
 		title: "Interview",
 		cancelled: true,
@@ -581,17 +677,25 @@ test("invalid input result renders as invalid input", () => {
 		},
 	};
 
-	assert.equal(renderResultText(result), "Invalid input");
+	assert.equal(renderResultText(result), "Invalid tool payload");
 });
 
-test("cancelled result renders as cancelled", () => {
+test("cancelled result hides unanswered questions", () => {
 	const result = {
 		title: "Interview",
 		cancelled: true,
 		mode: "submit" as const,
-		questions: [],
+		questions: [
+			{
+				id: "scope",
+				label: "Scope",
+				prompt: "What scope?",
+				type: "single" as const,
+			},
+		],
 		answers: {},
 	};
 
+	assert.equal(summarizeResult(result), "User cancelled the ask flow");
 	assert.equal(renderResultText(result), "Cancelled");
 });

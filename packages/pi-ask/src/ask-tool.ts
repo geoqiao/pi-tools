@@ -17,6 +17,7 @@ import { getAskConfigStore } from "./config/store.ts";
 import type { RemoteAskRuntime } from "./remote-ask.ts";
 import { runRpcAskFlow } from "./rpc/controller.ts";
 import { AskParamsSchema } from "./schema.ts";
+import { prepareAskParams } from "./state/normalize.ts";
 import type { AskParams } from "./types.ts";
 import { runAskFlow } from "./ui/controller.ts";
 
@@ -32,6 +33,7 @@ export function registerAskTool(
 			"Clarify ambiguous or preference-sensitive decisions with a short interactive interview before proceeding",
 		promptGuidelines: [...ASK_TOOL_PROMPT_GUIDELINES],
 		parameters: AskParamsSchema,
+		prepareArguments: (args) => prepareAskParams(args) as AskParams,
 		execute: (toolCallId, params, signal, onUpdate, ctx) =>
 			executeAskTool(
 				pi,
