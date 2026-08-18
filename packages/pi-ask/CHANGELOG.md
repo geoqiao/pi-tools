@@ -61,7 +61,7 @@
 
 ### BREAKING CHANGES
 
-- pi dependencies moved from @mariozechner/_ to @earendil-works/_.
+- pi dependencies moved from `@mariozechner/*` to `@earendil-works/*`.
 
 Consumers must use the latest pi package scope.
 
