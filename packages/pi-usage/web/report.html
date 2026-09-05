@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--CSP-->
+<title>Pi Usage · 用量分析</title>
+<style>/*STYLE*/</style>
+</head>
+<body>
+<a class="skip" href="#main">跳至分析看板</a>
+<header class="app-header">
+  <a class="brand" href="#overview"><span class="brand-mark">π</span><span>Usage<span class="brand-sub">LOCAL ANALYTICS</span></span></a>
+  <nav class="views" aria-label="分析视图"><button data-view="overview" aria-pressed="true"><span data-icon="dashboard"></span>看板</button><button data-view="percentiles" aria-pressed="false"><span data-icon="range"></span>日分布</button><button data-view="simulation" aria-pressed="false"><span data-icon="compare"></span>模型计价</button><button data-view="records" aria-pressed="false"><span data-icon="table"></span>明细</button></nav>
+  <div class="actions"><button id="export" class="icon-button" data-icon="download" aria-label="导出当前筛选的日级明细 CSV" title="导出当前筛选的日级明细 CSV"></button><button id="print" class="icon-button" data-icon="print" aria-label="打印当前视图 / PDF" title="打印当前视图 / PDF"></button><button id="info" class="icon-button" data-icon="info" aria-label="来源状态、价格与统计口径" title="来源状态、价格与统计口径"></button></div>
+</header>
+<main id="main">
+  <section class="filters" aria-label="组合筛选">
+    <div class="date-filter"><span data-icon="calendar"></span><input type="date" id="from" aria-label="开始日期"><span class="muted">—</span><input type="date" id="to" aria-label="结束日期"></div>
+    <div class="presets" aria-label="截至报告日期的范围"><button data-days="7">7D</button><button data-days="30">30D</button><button data-days="90">90D</button><button data-days="all">全部</button></div>
+    <span class="filter-spacer"></span><button id="reset" class="icon-button" data-icon="reset" aria-label="重置全部筛选" title="重置全部筛选"></button>
+    <div class="dimension-filters">
+      <label><span data-icon="terminal"></span><span>Harness</span><select id="source"><option value="">全部</option></select></label>
+      <label><span data-icon="model"></span><span>模型</span><select id="model"><option value="">全部</option></select></label>
+      <label><span data-icon="folder"></span><span>项目</span><select id="project"><option value="">全部</option></select></label>
+      <label><span data-icon="monitor"></span><span>终端</span><select id="hostname"><option value="">全部</option></select></label>
+      <label><span data-icon="branch"></span><span>请求</span><select id="requestType" aria-label="请求类型"><option value="">全部</option></select></label>
+    </div>
+  </section>
+  <div class="scope-line"><p id="filter-status" role="status" aria-live="polite"></p><button id="snapshot" class="text-button" title="查看数据快照和来源状态"><span class="status-dot"></span><span id="snapshot-label">本地快照</span><span data-icon="info"></span></button></div>
+  <div id="breadcrumbs" class="breadcrumbs" aria-label="当前筛选，可逐项移除"></div>
+  <section id="metrics" class="metrics" aria-label="当前筛选的用量">
+    <div class="total-metric"><span class="eyebrow">TOKEN <span class="muted">/ 含缓存</span></span><strong id="total-value" class="number">—</strong><span id="net-value" class="metric-note"></span><div id="token-ribbon" class="token-ribbon" aria-hidden="true"></div></div>
+    <div id="composition" class="composition"></div>
+    <div class="cost-metric"><span id="cost-label" class="eyebrow">估算 · USD</span><strong id="cost-value" class="number">—</strong><div class="coverage-track" aria-hidden="true"><span id="coverage-bar"></span></div><span id="coverage-value" class="metric-note"></span></div>
+  </section>
+  <div id="empty-state" class="empty" hidden>当前筛选没有用量记录。调整筛选或重置即可继续。</div>
+  <section id="overview" class="view" aria-label="用量看板">
+    <div class="dashboard-grid">
+      <section class="panel trend-panel">
+        <div class="panel-head"><h1><span data-icon="trend"></span>每日趋势</h1><div class="actions"><span id="activity-count" class="badge"></span><select id="trend-metric" aria-label="趋势指标"><option value="tokens">Token 构成</option><option value="inputTokens">输入（含缓存写）</option><option value="cachedInputTokens">缓存读取</option><option value="outputTokens">输出</option><option value="reasoningOutputTokens">推理</option><option value="cost">已知估算金额</option></select><button class="icon-button small" data-help="trend" data-icon="info" aria-label="趋势图说明"></button></div></div>
+        <div id="trend"></div><div class="chart-footer"><div id="trend-legend" class="legend"></div><span class="muted">点击日期下钻</span></div>
+      </section>
+      <section class="panel request-panel">
+        <div class="panel-head"><h2><span data-icon="branch"></span>请求构成</h2><button class="icon-button small" data-help="request" data-icon="info" aria-label="请求类型分类口径"></button></div>
+        <div class="request-visual"><div id="request-ring"></div><div id="request-summary" aria-label="按请求类型筛选"></div></div><div id="classification-note" class="panel-foot"></div>
+      </section>
+      <section class="panel harness-panel"><div class="panel-head"><h2><span data-icon="terminal"></span>Harness</h2><span id="harness-count" class="badge"></span></div><div id="harness-ranking" class="ranking"></div><div class="panel-foot">含缓存 Token · 点击联动筛选</div></section>
+      <section class="panel ranking-panel">
+        <div class="panel-head"><h2><span data-icon="layers"></span>用量分布</h2><div class="actions"><select id="distribution-dimension" aria-label="分布维度"><option value="model">模型</option><option value="project">项目</option><option value="hostname">终端</option><option value="source">Harness</option><option value="requestType">请求类型</option></select><select id="distribution-metric" aria-label="分布指标"><option value="allTokens">Token</option><option value="inputTokens">输入</option><option value="cachedInputTokens">缓存读</option><option value="outputTokens">输出</option><option value="reasoningOutputTokens">推理</option><option value="knownCost">已知金额</option></select></div></div>
+        <div id="distributions" class="ranking"></div><div class="panel-foot"><span id="ranking-note"></span><button id="show-all" class="text-button" aria-expanded="false">全部</button></div>
+      </section>
+      <section class="panel daily-panel"><div class="panel-head"><h2><span data-icon="range"></span>典型一天</h2><button class="icon-button small" data-view="percentiles" data-icon="expand" aria-label="展开每日分位分析" title="展开每日分位分析"></button></div><div class="daily-hero"><div><span class="eyebrow">P50 · TOKEN / 日</span><strong id="daily-median" class="number">—</strong></div><span id="daily-sample" class="badge"></span></div><div id="daily-histogram"></div><div id="daily-range"></div><div id="daily-stats" class="six-stats"></div><div class="panel-foot">仅描述样本 · 不预测未来</div></section>
+    </div>
+  </section>
+  <section id="percentiles" class="view" aria-label="每日分布与分位" hidden>
+    <div class="view-heading"><h1>日分布</h1><div class="actions"><span class="muted">Min → Max · 同一样本</span><button class="icon-button small" data-help="quantile" data-icon="info" aria-label="分位与样本口径"></button></div></div>
+    <div class="sample-controls"><label class="checkbox"><input type="checkbox" id="include-zero">无记录日按 0 纳入</label><span id="sample-note"></span></div>
+    <div class="analysis-grid"><section class="panel"><div class="panel-head"><h2>Token 分位</h2><span class="muted">各行独立刻度</span></div><div id="quantile-charts"></div><details><summary>精确数值</summary><div id="quantiles" class="table-wrap" tabindex="0" aria-label="Token 分位表"></div></details></section><section class="panel"><div class="panel-head"><h2>日金额 · USD</h2><button class="icon-button small" data-help="cost" data-icon="info" aria-label="完整日金额样本与偏差"></button></div><div id="cost-sample-note" class="notice"></div><div id="cost-range"></div><div id="cost-stats" class="six-stats"></div><details><summary>完整金额 / 已知小计</summary><div id="cost-quantiles" class="table-wrap" tabindex="0" aria-label="日金额分位表"></div></details><details id="unpriced"><summary>未完整定价模型</summary><div id="unpriced-models" class="table-wrap" tabindex="0" aria-label="未定价模型"></div></details></section></div>
+    <section class="panel"><div class="panel-head"><h2>每日数值</h2><span class="muted">选择日期可下钻</span></div><div id="daily-table" class="table-wrap" tabindex="0" aria-label="每日用量"></div></section>
+  </section>
+  <section id="simulation" class="view" aria-label="跨模型计价" hidden>
+    <div class="view-heading"><h1>模型计价</h1><div class="actions"><button id="simulation-sample" class="text-button" data-view="percentiles"></button><select id="simulation-sort" aria-label="模型计价排序"><option value="p50">P50 ↑</option><option value="p90">P90 ↑</option><option value="min">Min ↑</option><option value="max">Max ↑</option></select><button class="icon-button small" data-help="simulation" data-icon="info" aria-label="同工作量计价假设与限制"></button></div></div>
+    <div class="simulation-caption"><span>固定每日四类 Token → 目标模型费率 → 日金额分布</span><span class="muted">USD / 日 · 非实际节省预测</span></div>
+    <section class="panel simulation-panel"><div class="panel-head"><span id="simulation-note" class="muted"></span><div class="range-legend"><span>细线 Min–Max</span><span>色带 P25–P75</span><span>● P50</span><span>◇ P90</span></div></div><div id="simulations" class="table-wrap" tabindex="0" aria-label="跨模型每日金额与分位"></div></section>
+  </section>
+  <section id="records" class="view" aria-label="日级明细" hidden><div class="view-heading"><h1>日级明细</h1><select id="sort" aria-label="明细排序"><option value="date">日期 ↓</option><option value="cost">已知金额 ↓</option><option value="tokens">Token ↓</option></select></div><section class="panel"><div class="panel-head"><span class="muted">日期 × Harness × 模型 × 项目 × 终端 × 请求类型</span><button class="icon-button small" data-help="details" data-icon="info" aria-label="明细与 CSV 导出口径"></button></div><div id="details" class="table-wrap" tabindex="0" aria-label="日级用量明细"></div><div class="pagination"><span id="page-status"></span><button id="previous" class="icon-button" data-icon="left" aria-label="上一页"></button><button id="next" class="icon-button" data-icon="right" aria-label="下一页"></button></div></section></section>
+  <footer><span><span data-icon="lock"></span>本地快照 · 离线可用</span><span id="footer-meta"></span></footer>
+</main>
+<dialog id="information" aria-labelledby="info-title"><div class="dialog-head"><h2 id="info-title">数据与口径</h2><button id="close-info" class="icon-button" data-icon="close" aria-label="关闭信息面板"></button></div><div class="dialog-body"><p id="help-message" class="notice" hidden></p><p id="metadata" class="meta"></p><p id="warnings" class="notice" hidden></p>
+<details open><summary>来源状态</summary><div id="source-status" class="table-wrap" tabindex="0" aria-label="来源读取状态"></div></details>
+<details><summary>价格与出处</summary><div id="price-table" class="table-wrap" tabindex="0" aria-label="模型费率出处"></div></details>
+<details><summary>Token 与金额</summary><p>输入包含缓存写，缓存读取单列；输出不含已拆分的推理。allTokens = 输入 + 缓存读取 + 输出 + 推理；totalTokens 不含缓存读取。Token 不代表产出或生产力。</p><p>金额使用 models.dev 社区价格快照及本地覆盖，按美元 / 百万 Token 估算，不是实际扣款。未知费用为 null，不是免费；部分定价仅显示已知小计。可计价覆盖率按含缓存 Token 计算，不是账单覆盖率。</p><p>无法恢复缓存写入溢价、上下文阶梯、历史调价、批量折扣、媒体费用、税费或订阅抵扣。</p></details>
+<details><summary>请求类型</summary><p>非工具调用请求：完整响应可确认没有工具调用。含工具调用请求：至少包含一次工具调用，文字与调用混合也归此类。其他（无法判定）：缺少响应、无法可靠关联、旧汇总或尚不支持分类的来源。</p><p>整条请求 usage 互斥归类，三类合计等于总量，不逐工具分摊，不表示工具自身用量。占比是含缓存 Token 比例，不是请求次数。Pi / Oh My Pi、Claude Code、Codex、ZCode 和 Kimi Code 已支持有证据的分类：Codex 使用单次响应边界并核对完成账本；ZCode 精确关联 message_id；Kimi 匹配 step 完成证据。不把整个 turn 或相邻工具当作一次请求。累计回退、缺边界、关联冲突、损坏记录及其他未接入来源仍归其他。旧报告需重新读取日志才能补出分类。</p></details>
+<details><summary>日期、分位与模型计价</summary><p>按报告时区归入日期；无记录可能是未使用、日志缺失或读取不全，不能自动视为零。截止日可能未结束。报告是主动查询快照，不做后台更新。</p><p>默认仅有用量日，无记录日按 0 纳入是显式假设。Min / P25 / P50 / P75 / P90 / Max 使用同一样本；分位采用线性插值，各指标不一定来自同一天，极值不是预算边界或预测。完整日金额分位排除未完整定价日期，可能产生样本偏差。</p><p>模型计价固定当前筛选的每天四类 Token，逐日按本报告用过的目标模型费率重新计价，然后计算分位，不把各类 Token 的分位乘价相加。目标费率齐备即可模拟，不要求原模型已定价。这不是实际节省、质量或速度预测。</p></details>
+<details><summary>导出与隐私</summary><p>页面与下载 CSV 按日期 × Harness × 模型 × 项目 × 终端 × 请求类型聚合；同目录 details.csv / usage.json 保持原始粒度。Harness 对应 source 字段，亦包括 Cursor 等来源。</p><p>保留来源级去重，不推断工时或模型级会话关联；会话仅保留在本地 JSON / sessions.csv。来源读取可联网，采集结果不上传；本 HTML 不发起网络请求。</p></details>
+</div></dialog>
+<noscript>启用 JavaScript 查看报告，或打开同目录 details.csv 查看原始明细。</noscript>
+<script>/*SCRIPT*/</script>
+</body>
+</html>

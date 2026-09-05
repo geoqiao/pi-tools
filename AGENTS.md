@@ -6,6 +6,7 @@ Guidance for agents working in this monorepo.
 
 - `packages/pi-ask` — `@geoqiao/pi-ask`; follow its package-local `AGENTS.md`.
 - `packages/paseo-btw` — `@geoqiao/paseo-btw`; keep the Pi extension, CLI launcher, and portable Skill behavior aligned.
+- `packages/pi-usage` — `@geoqiao/pi-usage`; source retrieval may use the network, but collected usage must never be uploaded. Keep HTML self-contained; preserve vendored parser attribution and price provenance.
 
 The packages are published independently. Do not introduce runtime coupling between them unless a
 task explicitly requires it.

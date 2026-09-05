@@ -1,0 +1,51 @@
+{
+  "name": "@geoqiao/pi-usage",
+  "version": "0.1.0",
+  "description": "AI coding usage analytics with private, self-contained HTML reports. No usage uploads.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "usage",
+    "tokens",
+    "analytics",
+    "local-first"
+  ],
+  "files": [
+    "bin",
+    "src",
+    "web",
+    "data",
+    "vendor/vibe-usage/src",
+    "vendor/vibe-usage/NOTICE.md",
+    "vendor/vibe-usage/upstream-files.json",
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "pi-usage": "bin/pi-usage.js"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/usage-report.js"
+    ]
+  },
+  "engines": {
+    "node": ">=22.15"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/geoqiao/pi-tools.git",
+    "directory": "packages/pi-usage"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js vendor/vibe-usage/test/*.test.js",
+    "typecheck": "node scripts/check.js",
+    "pack:check": "npm pack --dry-run"
+  }
+}

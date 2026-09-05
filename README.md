@@ -73,16 +73,25 @@ npx skills add geoqiao/pi-tools --skill paseo-btw --agent '*' -g
 
 [Read the package guide →](packages/paseo-btw)
 
+### Keep usage private — [`@geoqiao/pi-usage`](packages/pi-usage)
+
+Analyze 28 AI coding data sources locally and generate a self-contained HTML dashboard with
+filters, token/cost trends, percentiles, model cost simulations, and CSV exports. Source retrieval
+may use the network; collected usage is never uploaded. Includes `/usage-report` and a standalone CLI.
+
+[Read the package guide →](packages/pi-usage)
+
 ## Workspace
 
 ```text
 packages/
 ├── pi-ask/      # Interactive clarification tool and ask-user skill
-└── paseo-btw/   # Paseo side-conversation extension, CLI, and portable skill
+├── paseo-btw/   # Paseo side-conversation extension, CLI, and portable skill
+└── pi-usage/    # Local usage analytics, HTML reports, Pi command, and CLI
 ```
 
 The packages share repository tooling but have no runtime coupling. Installing or releasing one
-does not install or release the other.
+does not install or release the others.
 
 ## Development
 
