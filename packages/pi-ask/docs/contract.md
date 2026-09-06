@@ -1,6 +1,6 @@
 # Ask tool contract
 
-`ask_user` is a pi-native clarification tool for cases where implementation depends on user preference or missing requirements.
+`ask_user` is a pi-native clarification tool for material requirement, preference, or high-impact authorization gaps left after context review, and for explicitly requested interviews.
 
 This document defines the stable external behavior. It does not explain internal helper-by-helper implementation.
 
@@ -196,8 +196,8 @@ This document defines the stable external behavior. It does not explain internal
 - option-targeted elaboration items include the specific noted option plus whether it is currently selected
 - question-targeted elaboration items include whether the question already has a committed answer
 - `elaboration.instruction` tells the agent to answer the clarification directly first, then re-ask only the affected questions if a choice is still needed
-- after clarification, agents should prefer another structured follow-up over plain-text multiple choice when a decision is still unresolved
-- once prior answers narrow the branch, agents should bundle the next 2-3 related unresolved questions into one follow-up ask when possible, instead of using a long sequence of single-question asks
+- after clarification, agents should use a structured follow-up rather than plain-text multiple choice only when a material decision still blocks progress
+- follow-ups should preserve settled answers and ask only current blockers; related blockers may be bundled when they do not depend on each other's answers, without filling a question quota
 - `elaboration` is only present when `mode === "elaborate"`
 - elaborate `content` text and transcript rendering describe each note directly using the full question prompt and option label, and include the current committed answer text when available, instead of a generic elaboration banner
 - when the user selects `Elaborate` without adding notes, elaborate `content` text and transcript rendering still include the committed answer text so the agent can elaborate on that answer directly
@@ -332,9 +332,15 @@ The non-interactive fallback message includes normalized pending questions and o
 
 ## Skill alignment (advisory)
 
-The auto-bundled skill profile at `skills/ask-user/SKILL.md` defines agent-side decision-gate guidance for when to call `ask_user`. It is enabled by default when the package is installed, but can be disabled via `pi config`.
+The tool description, `promptSnippet`, `promptGuidelines`, and auto-bundled [`ask-user` skill](../skills/ask-user/SKILL.md) share the same context-first policy. The skill is enabled by default when installed and can be disabled via `pi config`; the tool guidance does not depend on loading it.
 
-It is advisory only. If there is any conflict, contract + tests win.
+Read available code, docs, conversation, prior answers, and existing authorization before asking. Use `ask_user` only for a critical requirement still missing/conflicting, an unresolved preference that materially changes the outcome, or missing authorization for a consequential or hard-to-reverse action beyond the approved scope. Explicit requests for interviews, requirements gathering, or interactive questions also use `ask_user`; a requested written questionnaire remains a prose artifact.
+
+Do not ask about matters already resolved by context or reconfirm settled choices/authorization. Proceed with reversible steps and ordinary implementation details within scope, stating useful assumptions. Multiple viable options and labels such as architecture, naming, or research alone do not justify asking. Complete clear comparison/research requests first rather than automatically starting an interview. Ask only current blockers (or the current requested interview topic), and reopen settled decisions only for materially new information.
+
+Delegated autonomy does not waive safety boundaries. Cancellation, missing answers, or ambiguous responses are not high-risk approval; leave unauthorized actions blocked. Neither `cancelled: false` nor advisory `required` metadata establishes approval.
+
+This policy is advisory, not runtime authorization enforcement; contract + tests take precedence for tool behavior. `tests/ask-tool.test.ts` checks the actual registered prompt fields, retained payload/RPC guidance, and removal of old blanket triggers. These are static string checks, not proof of model behavior. The skill records behavioral evaluation cases, including small edits, approved plans, missing requirements, unauthorized high-risk actions, explicit interviews, and ordinary comparisons. Actual evaluation requires model sessions and inspection of context reads, questions, and subsequent actions, with and without the skill; record false positives/negatives separately from static test results.
 
 ## Source of truth
 
