@@ -30,7 +30,7 @@ export function registerAskTool(
 		label: "Ask User",
 		description: ASK_TOOL_DESCRIPTION,
 		promptSnippet:
-			"Clarify ambiguous or preference-sensitive decisions with a short interactive interview before proceeding",
+			"Ask only for material requirement/preference or high-impact authorization gaps left after context review, or explicitly requested interviews",
 		promptGuidelines: [...ASK_TOOL_PROMPT_GUIDELINES],
 		parameters: AskParamsSchema,
 		prepareArguments: (args) => prepareAskParams(args) as AskParams,

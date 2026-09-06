@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { Value } from "typebox/value";
 import { registerAskTool } from "../src/ask-tool.ts";
@@ -38,9 +39,11 @@ function registerMockTool() {
 	return {
 		entries,
 		tool: tools[0] as {
+			description: string;
 			execute: (...args: any[]) => Promise<any>;
 			parameters: Record<string, any>;
 			prepareArguments: (args: unknown) => unknown;
+			promptSnippet: string;
 			promptGuidelines: string[];
 			renderCall: (args: unknown, theme: any) => { text: string };
 			renderResult: (
@@ -51,6 +54,122 @@ function registerMockTool() {
 		},
 	};
 }
+
+// These are static prompt regressions, not evaluations of model behavior.
+test("registered ask prompts require material gaps after context review (static)", () => {
+	const { tool } = registerMockTool();
+	const guidelines = tool.promptGuidelines.join("\n");
+
+	for (const text of [tool.description, tool.promptSnippet, guidelines]) {
+		for (const concept of [
+			"context",
+			"requirement",
+			"preference",
+			"authorization",
+			"explicitly requested interviews",
+		]) {
+			assert.ok(text.includes(concept), `Missing prompt concept: ${concept}`);
+		}
+	}
+	for (const rule of [
+		"read available context: code, docs, conversation, and prior answers",
+		"Ask only if a critical requirement or outcome-changing preference remains unresolved",
+		"consequential or hard-to-reverse action exceeds existing authorization",
+		"requirements gathering, or interactive questions",
+		"Multiple options or architecture/naming/research labels alone do not justify asking",
+		"analyze clear comparison/research requests first",
+		"Do not use `ask_user` to reconfirm settled choices or authorization",
+		"Proceed with authorized reversible steps and routine implementation details",
+		"state useful assumptions",
+		"delegated autonomy does not waive safety boundaries",
+		"Cancellation, missing answers, or ambiguity are not high-risk approval",
+		"keep unauthorized high-risk actions blocked",
+		"ask only current blockers (or the requested interview topic)",
+		"bundle independent related questions",
+		"Answer elaboration notes first; re-ask only remaining blockers",
+		"Reopen settled decisions only for materially new information",
+	]) {
+		assert.ok(guidelines.includes(rule), `Missing registered rule: ${rule}`);
+	}
+	// Pi appends these bullets without a tool-name prefix.
+	assert.ok(tool.promptGuidelines.every((text) => text.includes("`ask_user`")));
+});
+
+test("registered ask prompts preserve payload and TUI/RPC constraints (static)", () => {
+	const { tool } = registerMockTool();
+	const guidelines = tool.promptGuidelines.join("\n");
+
+	for (const text of [tool.description, guidelines]) {
+		for (const rule of [
+			"stable `id`",
+			"non-empty `prompt`",
+			"non-empty machine-readable `value`",
+			"visible `label`",
+			"every option has non-empty `preview` text",
+			"descriptions alone do not suffice",
+		]) {
+			assert.ok(text.includes(rule), `Missing payload guidance: ${rule}`);
+		}
+	}
+	assert.ok(
+		tool.description.includes(
+			"TUI supports single-select, multi-select, and preview-pane questions"
+		)
+	);
+	for (const rule of [
+		"one decision per question",
+		"Keep labels short and options distinct; no filler",
+		"`single` for one answer",
+		"`multi` for multiple possible selections",
+		"recommendations are not preselected",
+		"questions are sequential with one choice or `Type something…`",
+		"typed multiple choices",
+		"previews flatten into option text",
+		"Do not promise same-screen forms, native checkbox cards, or a custom preview pane",
+	]) {
+		assert.ok(guidelines.includes(rule), `Missing tool constraint: ${rule}`);
+	}
+});
+
+test("registered prompts and bundled skill omit blanket interview triggers (static)", async () => {
+	const { tool } = registerMockTool();
+	const skill = await readFile(
+		new URL("../skills/ask-user/SKILL.md", import.meta.url),
+		"utf-8"
+	);
+
+	for (const text of [
+		tool.description,
+		tool.promptSnippet,
+		...tool.promptGuidelines,
+		skill,
+	]) {
+		for (const obsoleteRule of [
+			"choosing between multiple valid directions",
+			"When multiple valid directions exist, call `ask_user`",
+			"Use `ask_user` before making preference-sensitive decisions about",
+			"Clarify ambiguous or preference-sensitive decisions with a short interactive interview before proceeding",
+			"force explicit user alignment",
+			"scope research, plan work, compare options",
+			"## Handshake (required)",
+		]) {
+			assert.ok(
+				!text.includes(obsoleteRule),
+				`Obsolete blanket trigger: ${obsoleteRule}`
+			);
+		}
+	}
+	assert.ok(skill.includes("Read available context before asking"));
+	assert.ok(
+		skill.includes("Do not reconfirm settled choices or existing authorization")
+	);
+	assert.ok(
+		skill.includes(
+			"Cancellation, missing answers, or ambiguous responses are not approval for high-risk actions"
+		)
+	);
+	assert.ok(skill.includes("not a runtime authorization mechanism"));
+});
 
 test("ask option schema and tool guidance support grounded recommendations", () => {
 	const { tool } = registerMockTool();

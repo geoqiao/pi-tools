@@ -13,21 +13,18 @@ import type {
 } from "./types.ts";
 
 export const ASK_TOOL_DESCRIPTION =
-	"Interactive clarification tool for cases where the next step depends on user preferences, missing requirements, or choosing between multiple valid directions. Ask a short structured interview, collect normalized answers, and continue using those answers explicitly instead of guessing. TUI mode supports single-select, multi-select, and preview-pane questions; RPC mode presents questions sequentially, offers one portable choice per question plus a typed-answer fallback, and flattens preview details into option text. Always include a stable `id` and non-empty `prompt` for every question, plus a machine-readable `value` and visible `label` for every option. Use `preview` only when every option includes `preview` text; descriptions alone are not enough.";
+	"Interactive clarification after reading context: ask only for unresolved critical requirements, outcome-changing preferences, or consequential/hard-to-reverse actions beyond existing authorization; also for explicitly requested interviews, requirements gathering, or interactive questions. Multiple options alone do not justify asking. TUI supports single-select, multi-select, and preview-pane questions; RPC asks sequentially with one choice or typed input, flattening previews into option text. Include a stable `id` and non-empty `prompt` for each question, plus a non-empty machine-readable `value` and visible `label` for each option. Use `preview` only when every option has non-empty `preview` text; descriptions alone do not suffice.";
 
 export const ASK_TOOL_PROMPT_GUIDELINES = [
-	"Use `ask_user` before making preference-sensitive decisions about scope, tone, UX, naming, architecture, docs, or implementation direction.",
-	"When multiple valid directions exist, call `ask_user` with 1-3 concise questions instead of committing to one path on your own.",
-	"When calling `ask_user`, prefer one focused decision per question. Use short labels. Provide clear, distinct options. Do not add filler options.",
-	"When calling `ask_user`, always include a stable `id` and non-empty `prompt` for every question.",
-	"When calling `ask_user`, always include a non-empty machine-readable `value` and visible `label` for every option.",
-	"When calling `ask_user`, mark grounded preferences with `recommended: true` and use the option `description` to state the reason.",
-	"When calling `ask_user`, choose question `type` from the question semantics: `single` means one answer is expected, `multi` means multiple answers could reasonably be selected, and `preview` means options need preview-pane detail.",
-	'When calling `ask_user`, use `type: "preview"` only when every option includes non-empty `preview` text. Option descriptions do not satisfy this requirement.',
-	"After an `ask_user` elaboration or follow-up note, prefer another structured `ask_user` follow-up if a choice is still needed instead of switching to plain-text multiple choice in chat.",
-	"When prior `ask_user` answers narrow the branch, bundle the next 2-3 related unresolved decisions into one follow-up `ask_user` call when possible.",
-	"Use one-at-a-time `ask_user` follow-up calls only when the next question materially depends on the previous answer.",
-	"Do not promise same-screen forms, native checkbox cards, or a custom preview pane when `ask_user` is rendered through RPC; the portable fallback asks questions sequentially, and users type multiple choices through `Type something…` when one scalar selection is insufficient.",
+	"Before `ask_user`, read available context: code, docs, conversation, and prior answers. Ask only if a critical requirement or outcome-changing preference remains unresolved, or a consequential or hard-to-reverse action exceeds existing authorization.",
+	"Use `ask_user` for explicitly requested interviews, requirements gathering, or interactive questions. Multiple options or architecture/naming/research labels alone do not justify asking; analyze clear comparison/research requests first.",
+	"Do not use `ask_user` to reconfirm settled choices or authorization. Proceed with authorized reversible steps and routine implementation details; state useful assumptions.",
+	"With `ask_user`, delegated autonomy does not waive safety boundaries. Cancellation, missing answers, or ambiguity are not high-risk approval; keep unauthorized high-risk actions blocked.",
+	"In `ask_user`, ask only current blockers (or the requested interview topic), one decision per question; bundle independent related questions. Answer elaboration notes first; re-ask only remaining blockers. Reopen settled decisions only for materially new information.",
+	"For `ask_user`, include a stable `id` and non-empty `prompt` for each question, and a non-empty machine-readable `value` and visible `label` for each option. Keep labels short and options distinct; no filler.",
+	"For `ask_user`, mark grounded preferences with `recommended: true` and explain the reason in `description`; recommendations are not preselected.",
+	"For `ask_user`, use `single` for one answer, `multi` for multiple possible selections, and `preview` only when every option has non-empty `preview` text; descriptions alone do not suffice.",
+	"For `ask_user` in RPC, questions are sequential with one choice or `Type something…` (including typed multiple choices); previews flatten into option text. Do not promise same-screen forms, native checkbox cards, or a custom preview pane.",
 ] as const;
 
 interface ValidateParamsOptions {
