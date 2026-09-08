@@ -1,316 +1,166 @@
-![pi-ask main image](docs/media/pi-ask-main.png)
+# Pi Ask
 
-# @geoqiao/pi-ask
-
+[![npm version](https://img.shields.io/npm/v/@geoqiao/pi-ask)](https://www.npmjs.com/package/@geoqiao/pi-ask)
 [![npm downloads](https://badgen.net/npm/dm/@geoqiao/pi-ask)](https://www.npmjs.com/package/@geoqiao/pi-ask)
 [![CI](https://github.com/geoqiao/pi-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/geoqiao/pi-tools/actions/workflows/ci.yml)
-[![last commit](https://badgen.net/github/last-commit/geoqiao/pi-tools)](https://github.com/geoqiao/pi-tools/commits/main)
-[![stars](https://badgen.net/github/stars/geoqiao/pi-tools)](https://github.com/geoqiao/pi-tools/stargazers)
 
-> [!IMPORTANT]
-> This is an independently maintained continuation of [`eko24ive/pi-ask`](https://github.com/eko24ive/pi-ask), with portable Pi RPC mode support while preserving the rich TUI experience.
+**Answer your agent's questions without losing the thread.**
 
-`@geoqiao/pi-ask` is an ask tool that cares about your answers.
+`@geoqiao/pi-ask` adds structured clarification to [Pi](https://pi.dev): choose options, type your own answer, or ask for an explanation before deciding. Get a rich terminal form in TUI mode and portable sequential dialogs in RPC mode, with normalized answers returned to the agent.
 
-It lets an agent pause, ask structured questions in a terminal UI or portable Pi RPC dialogs, and continue with normalized answers instead of guessing.
+![Pi Ask: structured questions, custom answers, and review](docs/media/pi-ask-demo.gif)
 
-![pi-ask demo](docs/media/pi-ask-demo.gif)
+[Watch the high-quality demo](https://github.com/user-attachments/assets/a8503ca9-afcb-4c31-9edc-353b985a0209)
 
-High-quality video: [demo.mp4](https://github.com/user-attachments/assets/a8503ca9-afcb-4c31-9edc-353b985a0209)
+[Quick start](#quick-start) · [Everyday use](#everyday-use) · [TUI and RPC](#tui-and-rpc) · [Settings](#settings) · [Documentation](#documentation)
 
-## Upstream and contributions
-
-This project preserves the upstream Git history, MIT license, and author attribution. New
-development and releases are maintained independently in the
-[`geoqiao/pi-tools`](https://github.com/geoqiao/pi-tools/tree/main/packages/pi-ask) monorepo. Issues
-and contributions are welcome there.
-
-## Install
+## Quick start
 
 ```bash
 pi install npm:@geoqiao/pi-ask
 ```
 
-Or try it without installing (load once for the current run):
+Run `/reload` in an already-open Pi session. The agent can then call `ask_user` when clarification is needed; you can also explicitly ask it to interview you.
+
+To try the package for one run without adding it to your saved package configuration:
 
 ```bash
 pi -e npm:@geoqiao/pi-ask
 ```
 
-## Features
+If the agent has already asked questions in plain text, run `/answer` in TUI mode to turn its latest completed message into a form.
 
-Once installed, this package gives the agent a native way to ask for clarification instead of guessing. The rich interface is used in TUI mode.
+> Independently maintained continuation of [eko24ive/pi-ask](https://github.com/eko24ive/pi-ask), preserving the upstream history, MIT license, and attribution while adding portable Pi RPC support.
 
-- 🧭 Familiar ask-style interface: tabbed questions, single/multi select, and preview mode
-- ⭐ Optional warning-colored `(recommended)` markers that do not preselect answers
-- ✍️ Inline free-form `Type your own` answers
-- 📎 Native pi-style `@` file references inside answer and note editors
-- 📝 Question-level and option-level notes
-- 👀 Review tab with `Submit`, `Elaborate`, and `Cancel`
-- 💬 Elaboration flow to capture note-based clarification before final submission
-- 🔌 Pi RPC fallback using portable sequential dialogs with normalized results
-- ⌨️ Context-aware customizable keymaps with aliases for main flow, editors, and settings
-- ⚙️ Ask settings with persisted behaviour, notifications, keymaps, and `/answer` extraction config
-- 🔔 Optional external notifications when an ask flow is waiting for input
-- 🔁 Slash commands for fallback/replay:
-  - `/answer` extracts questions from the latest assistant message into an ask flow
-  - `/answer:again` reopens the latest `/answer` form on the current branch
-  - `/ask:replay` replays the latest real `ask_user` form on the current branch
-- 🛟 Automatic recovery of an unanswered `ask_user` form after startup, resume, or fork
-- 🗣️ You can talk to your agent to configure pi-ask; it will read the bundled configuration guide and tailor the config for you
+## Everyday use
 
-## Feature walkthrough
-
-### Native `@` file references
-Use pi-style `@` file path autocomplete inside free-form answers and note editors.
-
-![Native pi-style @ file references inside the ask flow](docs/media/feature-at-file-mentions.png)
-
-### Option and question notes
-Attach clarification notes to a specific option (`n`) or add broader question-level context (`Shift+N`).
-
-| Option notes | Question notes |
+| Need | Feature |
 |---|---|
-| ![Option note editor with note text for selected option](docs/media/feature-option-note.png) | ![Question-level note editor with saved note](docs/media/feature-question-note.png) |
+| Choose one answer or several | Single-select, multi-select, and preview questions |
+| Give an answer outside the options | Inline `Type your own`, with native Pi-style `@` file references |
+| Understand a choice before deciding | Notes on a question or option, followed by `Elaborate` |
+| Review before continuing | `Submit`, `Elaborate`, and `Cancel` review actions in TUI |
+| See the agent's recommendation | Optional `(recommended)` markers with reasons; never preselected |
+| Recover a previous form | Replay commands and automatic recovery of interrupted TUI asks |
 
-### Review tab — Elaborate and Submit
-Ask the agent to elaborate on notes before finalizing choices, or review all answers before returning them to the agent.
+### Commands
 
-| Elaborate | Submit |
+| Command | What it does |
 |---|---|
-| ![Review tab with Elaborate action and expanded note preview](docs/media/feature-review-elaborate.png) | ![Review tab with Submit action highlighted](docs/media/feature-review-submit.png) |
+| `/answer` | Extracts questions from the latest completed assistant message and opens an ask form |
+| `/answer:again` | Reopens the latest `/answer` form on the current branch |
+| `/ask:replay` | Reopens the latest real `ask_user` form on the current branch |
+| `/ask-settings` | Opens the settings overlay; `?` inside a form opens the same overlay |
 
-### Single-select and multi-select questions
-Pick one option when answers are mutually exclusive, or choose multiple options when several answers apply.
+These commands are TUI-only. Replay is branch-aware and works with `/resume` and `/tree`. Closing a command-opened form does not start an agent turn; submitting or elaborating sends a normal user follow-up.
 
-| Single-select | Multi-select |
-|---|---|
-| ![Single-select question with one selected option](docs/media/feature-single-select.png) | ![Multi-select question with multiple selected options](docs/media/feature-multi-select.png) |
+`/answer` uses a configured extraction model and the preceding user message as context. It validates the extracted form and retries missing or invalid output. Normal `ask_user` calls do not use this extraction model. See [extraction settings](docs/configuration.md#answer-extraction).
 
-### Preview mode
-Use a dedicated preview pane when options need richer detail.
+### When the agent asks
 
-![Preview question showing a dedicated preview pane](docs/media/feature-preview-pane.png)
+The agent should read available code, docs, conversation, and prior answers first. It asks only for unresolved critical requirements, outcome-changing preferences, or consequential/hard-to-reverse actions beyond existing authorization. Explicitly requested interviews, requirements gathering, and interactive questions also use `ask_user`.
 
-### Custom answer (`Type your own`)
-Capture free-form input inline without leaving the flow.
+Clear small changes, settled choices, authorized reversible steps, and routine implementation details proceed without reconfirmation. Multiple options or architecture/naming/research labels alone do not trigger questions; clear comparison/research requests get analysis first. Follow-ups address only current blockers, and settled decisions reopen only for materially new information.
 
-![Inline custom answer input for Type your own option](docs/media/feature-custom-answer-input.png)
+Delegated autonomy does not waive safety boundaries. Cancellation, skipped questions, and unclear answers are not high-risk approval. This is prompt guidance, **not a runtime permission check or a guarantee of model behavior**. See the [policy and verification limits](docs/contract.md#skill-alignment-advisory) and [skill examples](skills/ask-user/SKILL.md#examples-and-behavioral-evaluation-cases).
 
-## Default key bindings
+## TUI and RPC
 
-Open ask settings with `?` during the ask flow, or with the `/ask-settings` command from pi.
+Both modes return normalized answers, but their interfaces differ:
 
-Keymaps are context-aware and configurable in `~/.pi/agent/extensions/eko24ive-pi-ask.json`. The established filename is retained so users can switch from the upstream package without losing settings.
-Each action accepts a key string or an array of aliases.
-
-Default contexts:
-
-- `global`: `dismiss` (`Ctrl+C`) and `settings` (`?`)
-- `main`: confirm/cancel/toggle, tab navigation, option navigation, and note shortcuts
-- `editor`: custom answer submit/close and empty-editor navigation
-- `noteEditor`: note save/close and empty-editor navigation
-- `settingsModal`: close, next/previous setting, and toggle
-
-Fixed bindings:
-
-| Key | Context | Effect |
+| Capability | TUI | RPC with portable UI support |
 |---|---|---|
-| `1..9` | Options list | Select or toggle matching option |
-| `1` `2` `3` | Review tab | Trigger `Submit` / `Elaborate` / `Cancel` |
-| `@` | Editors | File-reference affordance |
-| Arrow keys / `Tab` | Non-empty editor | Stay in editor for cursor movement |
+| Layout | Tabbed, same-screen form | Sequential dialogs with `[current/total]` progress |
+| Answers | Native single/multi selection and custom text | One real option or `Type something…`; type multiple choices as free-form text |
+| Previews and recommendations | Preview pane and recommendation subtitles | Details flattened into option text; canonical labels and values stay unchanged |
+| Notes and review | Question/option notes and final review tab | No notes or final review; submitting an option advances directly |
+| Settings and replay commands | Supported | TUI-only |
+| Dismissal | Flow-level cancel/dismiss, with optional dirty-state confirmation | Dismissing a card or input skips that question; tool abort cancels the flow |
 
-Review-tab shortcuts can optionally require the same number key twice via `behaviour.doublePressReviewShortcuts`. `behaviour.presentSingleAsMulti` can render future single-select questions as multi-select while preserving the requested type in results; use `main.changeQuestionType` (`t` by default) to change the active question type live.
+RPC does not emulate checkbox cards, repeated multi-select dialogs, or custom preview panes. Unanswered questions remain unanswered, including those marked `required`: that field is advisory, not submission enforcement.
 
-You can edit the config file yourself, ask pi to edit it for you, or use `/ask-settings` to find the exact config path, toggle behaviour/notification settings, or reset config to defaults with a guarded double press. pi-ask treats the config file as user-owned: load-time migrations and invalid files are handled in memory without rewriting or backing up the file, and read-only/externally managed configs fail gracefully with a manual-edit message.
+Print, JSON, and RPC without portable UI cannot open a form. They return a needs-user-input message with pending questions rather than pretending to collect answers.
 
-```json
-{
-  "schemaVersion": 5,
-  "answer": {
-    "extractionModels": [
-      { "provider": "openai-codex", "id": "gpt-5.4-mini" },
-      { "provider": "github-copilot", "id": "gpt-5.4-mini" },
-      { "provider": "anthropic", "id": "claude-haiku-4-5" }
-    ],
-    "extractionTimeoutMs": 30000,
-    "extractionRetries": 1
-  },
-  "behaviour": {
-    "autoSubmitWhenAnsweredWithoutNotes": false,
-    "confirmDismissWhenDirty": true,
-    "doublePressReviewShortcuts": true,
-    "presentSingleAsMulti": false,
-    "showFooterHints": true
-  },
-  "keymaps": {
-    "global": { "dismiss": ["ctrl+c"], "settings": ["?"] },
-    "main": {
-      "confirm": ["enter"],
-      "cancel": ["esc"],
-      "toggle": ["space"],
-      "changeQuestionType": ["t"],
-      "nextTab": ["tab", "right"],
-      "previousTab": ["shift+tab", "left"],
-      "nextOption": ["down"],
-      "previousOption": ["up"],
-      "optionNote": ["n"],
-      "questionNote": ["shift+n"]
-    },
-    "editor": {
-      "submit": ["enter"],
-      "close": ["esc"],
-      "nextTabWhenEmpty": ["tab", "right"],
-      "previousTabWhenEmpty": ["shift+tab", "left"],
-      "nextOptionWhenEmpty": ["down"],
-      "previousOptionWhenEmpty": ["up"]
-    },
-    "noteEditor": {
-      "save": ["enter"],
-      "close": ["esc"],
-      "nextTabWhenEmpty": ["tab", "right"],
-      "previousTabWhenEmpty": ["shift+tab", "left"],
-      "nextOptionWhenEmpty": ["down"],
-      "previousOptionWhenEmpty": ["up"]
-    },
-    "settingsModal": {
-      "close": ["esc", "ctrl+c", "?"],
-      "nextOption": ["down"],
-      "previousOption": ["up"],
-      "toggle": ["enter", "space"]
-    }
-  },
-  "notifications": {
-    "enabled": true,
-    "channels": ["bell"]
-  }
-}
+### Interrupted forms
+
+Starting, resuming, or forking a TUI session recovers its newest unresolved `ask_user` form once. Submission is delivered as a user message because the original tool execution no longer exists. Submit or cancel prevents another automatic reopen; `/ask:replay` remains available.
+
+New sessions, extension reloads, non-TUI modes, and RPC do not trigger recovery.
+
+## Settings
+
+Open `/ask-settings`, or press `?` inside the TUI form. You can adjust auto-submit, dirty-dismiss confirmation, review shortcut confirmation, single-as-multi presentation, footer hints, and notifications. Resetting defaults requires a guarded double press.
+
+Settings save when the file is writable; failed saves revert the change and show a manual-edit message. Invalid files and load-time migrations do not rewrite user-owned configuration. The established upstream-compatible path remains:
+
+```text
+~/.pi/agent/extensions/eko24ive-pi-ask.json
 ```
 
-Accepted notation follows pi-tui key ids. Common aliases are normalized, for example `escape` → `esc`, `return` → `enter`, `control+c` → `ctrl+c`, and `Shift+N` → `shift+n`.
+For the complete config shape, defaults, keymap rules, notification channels, and extraction settings, use **[docs/configuration.md](docs/configuration.md)** rather than copying a second config example from this README. You can also ask your agent to configure pi-ask; it is instructed to read that guide first.
 
-## Use
+### Handy default keys
 
-After installation, the extension registers the `ask_user` tool plus `/ask-settings`, `/answer`, `/answer:again`, and `/ask:replay` commands.
+| Key | Context | Action |
+|---|---|---|
+| `Tab` / `Shift+Tab` | Main flow | Next / previous question tab |
+| `↑` / `↓` | Main flow | Move between options |
+| `Enter` / `Space` | Main flow | Confirm / toggle |
+| `1..9` | Options | Select or toggle by number |
+| `n` / `Shift+N` | Main flow | Add an option / question note |
+| `t` | Main flow | Change the current question type |
+| `?` | Form | Open settings |
+| `@` | Answer and note editors | Complete a file reference |
 
-Agents first read available context and call `ask_user` only for unresolved critical requirements, outcome-changing preferences, or consequential/hard-to-reverse actions beyond existing authorization. Explicitly requested interviews and requirements gathering also use the tool.
+In non-empty editors, arrows and `Tab` stay with the text. On the review tab, `1`, `2`, and `3` mean Submit, Elaborate, and Cancel; by default, each needs a second press. Destructive multi-to-single changes also require confirmation. The single-as-multi setting applies to new/replayed forms; `t` changes the active question. See [keymaps](docs/configuration.md#keymaps) for customization and the [contract](docs/contract.md#keyboard-behavior) for exact editing and cancellation behavior.
 
-Clear small changes, settled choices, authorized reversible steps, and routine implementation details proceed without reconfirmation. Multiple options or an architecture/naming/research label alone do not trigger questions; clear comparison/research requests get analysis first. Questions stay on current blockers, and settled decisions reopen only for materially new information. Delegated autonomy does not waive safety boundaries, and cancellation or missing/unclear answers never supplies high-risk approval. This is prompt guidance, not a runtime permission check; see the [policy and verification limits](docs/contract.md#skill-alignment-advisory) and [skill examples](skills/ask-user/SKILL.md#examples-and-behavioral-evaluation-cases).
+<details>
+<summary>Feature screenshots</summary>
 
-Agents can mark any number of grounded preferences with `recommended: true` and use option descriptions for reasons. In interactive sessions, it opens a terminal UI flow for structured answers, supports native pi-style `@` file references while typing answers or notes, and returns normalized answers back to the agent. Ask settings are available both from `?` in the ask flow and from the `/ask-settings` command. Behaviour and notification settings are binary `on`/`off` toggles that save immediately when the config file is writable; save failures revert the toggle and show a manual-edit message. The settings overlay includes a guarded double-press reset-to-defaults action; keymaps, notification channels, and extraction settings are changed by editing the shown config file path.
+| Feature | Preview |
+|---|---|
+| File references in answers and notes | ![Native @ file autocomplete](docs/media/feature-at-file-mentions.png) |
+| Option and question notes | ![Option note](docs/media/feature-option-note.png) ![Question note](docs/media/feature-question-note.png) |
+| Elaborate and Submit review | ![Elaborate review](docs/media/feature-review-elaborate.png) ![Submit review](docs/media/feature-review-submit.png) |
+| Single and multi selection | ![Single selection](docs/media/feature-single-select.png) ![Multi selection](docs/media/feature-multi-select.png) |
+| Rich option previews | ![Preview pane](docs/media/feature-preview-pane.png) |
+| A custom answer | ![Type your own answer](docs/media/feature-custom-answer-input.png) |
 
-### Pi RPC fallback
-
-When Pi runs in RPC mode with portable extension UI support, `ask_user` keeps the same normalized result contract but uses sequential dialogs:
-
-- each question card contains only its real options plus `Type something…`
-- selecting a real option and submitting advances directly to the next question or completes the flow
-- `Type something…` opens one `input` dialog; on multi questions it is the fallback for entering multiple choices
-- dismissing a question or its input skips that question instead of cancelling the flow
-- recommendation markers, descriptions, and preview content are flattened into readable option strings without changing canonical values or labels
-- multiple questions include `[current/total]` progress in each dialog title
-- tool abort signals close portable `select`/`input` dialogs and return `cancelled: true`
-
-RPC intentionally does not reproduce the tabbed same-screen form, native checkbox cards, repeated multi-select cards, notes, Skip/Cancel option rows, custom preview pane, question-type hotkeys, settings overlay, or final Submit/Elaborate review tab. The fallback completes in `submit` mode after the sequential questions. `/answer`, `/answer:again`, `/ask:replay`, and `/ask-settings` remain TUI-only.
-
-### Answer and replay commands
-
-`/answer` is useful when the agent asked questions in plain text instead of using `ask_user`. It supplies the preceding user message as context, asks the configured extraction model for one synthetic `ask_user` tool call, validates the result, and opens the same ask UI. Missing or invalid tool calls are retried; raw and fenced JSON text remain supported as fallbacks.
-
-Replay commands are branch-aware. They read persisted entries from the current pi session branch, so they work naturally with `/resume`, `/tree`, and conversation branching:
-
-- `/answer:again` reopens the latest form created by `/answer` on this branch
-- `/ask:replay` reopens the latest real `ask_user` form on this branch
-
-Cancellation is local to the UI: closing a replayed form does not start a new agent turn. Submitted answers are sent back as a normal user follow-up message.
-
-### Interrupted ask forms
-
-If Pi stops while an `ask_user` form is open, the tool call remains without a result. Starting, resuming, or forking that session reopens the newest unanswered form once. Submitting sends the result as a user message because the original tool execution no longer exists. Cancelling dismisses the automatic recovery. Either outcome prevents another automatic reopen, while `/ask:replay` remains available.
-
-New sessions, extension reloads, non-TUI modes, and RPC sessions do not trigger recovery.
-
-Kudos to [@k0valik](https://github.com/k0valik) for the `/answer` idea.
-
-You can also talk to pi to configure this extension. When asked to customize pi-ask settings, keymaps, notifications, or extraction behavior, the agent is instructed to read the bundled `docs/configuration.md` guide first and then edit the config file accordingly.
-
-This package also bundles the `ask-user` skill profile from `skills/ask-user/SKILL.md`. It reinforces when to use the tool, is enabled by default when installed, and can be disabled via `pi config`. The skill was inspired by https://github.com/edlsh/pi-ask-user.
-
-You can still add your own agent instruction if you want to further reinforce usage.
-
-For exact input/output and UX guarantees, see [`docs/contract.md`](docs/contract.md).
-
-## Local development
-
-### Run locally in pi
-
-```bash
-pi -e ./src/index.ts
-```
-
-### Run in isolated test mode (extension + bundled skill only)
-
-```bash
-pnpm dev
-pnpm dev ../test
-```
-
-`pnpm dev [path]` runs pi with `--no-extensions --no-skills --no-prompt-templates --no-themes --no-context-files`, loads this repo’s extension and `skills/ask-user`, and starts pi from `[path]` by changing directories before launch (defaults to `.`).
-
-### Install dependencies
-
-```bash
-pnpm install
-```
-
-### Install git hooks (contributors)
-
-`lefthook` is not installed automatically. If you want the local commit hooks used by this repo, run:
-
-```bash
-pnpm exec lefthook install
-```
-
-### Development commands
-
-```bash
-pnpm format
-pnpm lint
-pnpm check
-pnpm typecheck
-pnpm test
-```
-
-### Commit workflow
-
-This monorepo uses `lefthook`, Commitizen, conventional commitlint, and Changesets.
-
-If you want local hooks, install them once after `pnpm install`:
-
-```bash
-pnpm exec lefthook install
-```
-
-From the repository root, the recommended flow is:
-
-```bash
-pnpm commit
-```
-
-User-facing changes should also include a Changeset created with `pnpm changeset`.
-
-## Project layout
-
-- `src/` — TypeScript extension implementation
-- `tests/` — behavior-focused tests
-- `docs/` — small docs set for contract and architecture
-- `docs/media/` — repository-only README media assets
+</details>
 
 ## Documentation
 
-Docs stay intentionally small:
+| Guide | Contents |
+|---|---|
+| [Configuration](docs/configuration.md) | Settings, keymaps, notifications, and `/answer` extraction |
+| [Contract](docs/contract.md) | Input/output, TUI/RPC behavior, replay, and recovery guarantees |
+| [Architecture](docs/architecture.md) | Module responsibilities and invariants |
+| [Remote events](docs/remote-events.md) | Trusted local inter-extension integration |
+| [Ask User skill](skills/ask-user/SKILL.md) | Context-first clarification policy and behavioral evaluation cases |
 
-- `docs/README.md` — index
-- `docs/contract.md` — external behavior
-- `docs/architecture.md` — module boundaries and invariants
+The bundled skill is enabled by default when installed and can be disabled through `pi config`. Tool guidance remains available without it.
+
+## Development
+
+From the monorepo root:
+
+```bash
+pnpm --filter @geoqiao/pi-ask dev
+pnpm --filter @geoqiao/pi-ask dev /absolute/path/to/project
+```
+
+The dev script isolates this extension and its bundled skill using `--no-extensions --no-skills --no-prompt-templates --no-themes --no-context-files`, then changes to the target directory before launching Pi. To load just the extension manually, run `pi -e ./src/index.ts` from this package directory.
+
+```bash
+pnpm --filter @geoqiao/pi-ask typecheck
+pnpm --filter @geoqiao/pi-ask test
+pnpm --filter @geoqiao/pi-ask pack:check
+```
+
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for workspace setup, formatting, conventional commits, and Changesets. Local hooks are optional and are not installed automatically; run `pnpm exec lefthook install` at the workspace root if wanted. Keep README media in `docs/media/`; these assets are repository-only.
+
+## Attribution and contributions
+
+[MIT](LICENSE). This independently maintained continuation preserves [eko24ive/pi-ask](https://github.com/eko24ive/pi-ask)'s history and attribution. Development and issues live in [geoqiao/pi-tools](https://github.com/geoqiao/pi-tools).
+
+Thanks to [@k0valik](https://github.com/k0valik) for the `/answer` idea. The bundled skill was inspired by [edlsh/pi-ask-user](https://github.com/edlsh/pi-ask-user).

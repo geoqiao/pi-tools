@@ -1,120 +1,193 @@
-# @geoqiao/pi-usage
+# Pi Usage
 
-**获取 AI 编程工具的使用数据，在本机计价、分析并生成可离线打开的 HTML 报告；不上传统计数据。**
+[![npm version](https://img.shields.io/npm/v/@geoqiao/pi-usage)](https://www.npmjs.com/package/@geoqiao/pi-usage)
+[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A5%2022.15-417e38)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
-参考 [Vibe Usage](https://github.com/vibe-cafe/vibe-usage) 的解析代码和登录后仪表盘布局。
-独立维护，非 VibeCafé 官方产品。无运行时 npm 依赖，无后台服务，无 LLM 分析调用。
+**这段时间用了多少 Token，主要用在哪？把 AI 编程工具的使用记录，变成一份本地交互报告。**
 
-## 安装与使用
+`@geoqiao/pi-usage` 支持 Pi、Claude Code、Codex 等 **28 类数据源**，在本机完成计价和分析，生成可离线打开的 HTML 看板，并导出 CSV / JSON。无需额外注册账号，无后台服务、LLM 分析调用或运行时 npm 依赖；**不上传统计数据**。
 
-需要 **Node.js ≥ 22.15**。
+![Pi Usage 看板：日期与多维筛选、Token 构成、每日趋势、请求构成、用量排名和典型一天](https://raw.githubusercontent.com/geoqiao/pi-tools/main/packages/pi-usage/docs/media/pi-usage-dashboard.png)
+
+> 看板截图。金额按本地价格表估算，不是实际账单；报告是生成时的快照，不会自动更新。
+
+[快速开始](#快速开始) · [看板与分析](#看板与分析) · [命令行](#命令行) · [数据源与隐私](#数据源与隐私) · [计价口径](#计价口径)
+
+## 快速开始
+
+需要 **Node.js ≥ 22.15**。可作为 Pi 扩展使用，也可独立运行 CLI。
+
+### 在 Pi 中使用
 
 ```bash
 pi install npm:@geoqiao/pi-usage
-# 不安装 Pi 扩展，仅运行 CLI：
-npx @geoqiao/pi-usage --days 90
 ```
 
-安装后在 Pi 中运行（已打开的 Pi 先 `/reload`）：
+已打开的 Pi 先执行 `/reload`。默认分析最近 90 天，也可指定天数：
 
 ```text
 /usage-report
 /usage-report 30
 ```
 
-命令不触发模型回合，不将统计结果注入对话；UI 提示报告的本地路径。
-生成过程在独立 Node 子进程中执行，避免同步解析阻塞 Pi。退出或重载 Pi 会取消该进程。
+报告路径显示在 Pi UI 中，统计结果不会注入对话，也不会触发模型回合。生成在独立 Node 子进程中执行；退出或重载 Pi 会取消该进程。
 
-也可从源码运行，无需构建：
+### 独立运行
 
-```bash
-# 在 pi-tools 仓库根目录运行
-pi install ./packages/pi-usage
-node packages/pi-usage/bin/pi-usage.js --days 90
-```
-
-默认写入 `~/.pi/usage/reports/report-<随机后缀>/`。双击 `index.html` 即可打开；不需要本地 Web 服务器。
-每次生成独立快照，不会覆盖旧报告。
-
-| 文件 | 内容 |
-|---|---|
-| `index.html` | 数据、脚本和样式全部内嵌的交互报告 |
-| `details.csv` | 解析器原始粒度 × Harness × 模型 × 项目 × 终端 × 请求类型的 token 与费用明细 |
-| `sessions.csv` | 会话时长、消息数、开始和结束时间 |
-| `usage.json` | 字段白名单后的桶、会话、读取状态和价格；可再次离线分析 |
-
-CSV 使用 UTF-8 BOM、标准引号转义与公式注入防护，可直接在 Excel 中打开。
-POSIX 上新建报告目录权限为 0700，文件为 0600。报告含项目名和终端名，仍属于私人文件；不要放进自动同步的公共目录。
-
-## 命令行
+无需安装 Pi：
 
 ```bash
-pi-usage --days 90 --timezone Asia/Shanghai
-pi-usage --sources pi-coding-agent,claude-code,codex --days 30
-pi-usage --out /absolute/path/to/empty-report-directory
-pi-usage --prices /absolute/path/to/prices.json
-pi-usage --input /absolute/path/to/usage.json --days 90 --offline
-pi-usage --offline
-pi-usage --list-sources
-pi-usage --help
+npx @geoqiao/pi-usage --days 90
 ```
 
-`--days` 为包含今天的 1–3660 个日历日，默认 90；日期按 `--timezone` 分组，默认系统 IANA 时区。
-报告只能筛选采集窗口内的数据，不能凭空补回已删除的日志。`--out` 必须为空目录；非空即拒绝写入。
-`--input` 接受 `{ "buckets": [...], "sessions": [...] }`，不读取数据源，忽略原有费用并用本地价格重新计算。
-输入文件的其他字段不会被保留；来源完整性未验证，也不会自动沿用外部 CSV 中的疑似重复标记。
+命令完成后显示 `index.html` 的本地路径，双击即可打开，**不需要 Web 服务器**。默认报告目录为：
 
-## 交互分析看板
+```text
+~/.pi/usage/reports/report-<随机后缀>/
+```
 
-每次主动执行命令读取已有数据并生成快照，不做定时采集。默认回答 **「这段时间用了多少，主要用在哪？」**：含缓存 Token 优先，金额辅助。浅色分析画布、图标工具栏与四个视图代替长篇摘要；桌面首屏并列展示核心图表，移动端改为单列。
+每次生成独立快照，不覆盖旧报告。完全禁止来源网络请求时使用 `--offline`；它不影响 `npx` 首次从 npm 下载包。
 
-| 视图 / 操作 | 内容 |
-|---|---|
-| 看板 | 四类 Token 指标、日堆叠趋势、请求构成环图、Harness 排名、可切换维度排名、每日频数与分位区间 |
-| 联动筛选 | 日期 / Harness / 模型 / 项目 / 终端 / 请求类型组合筛选；点击柱形、排名或请求类型加入同一筛选状态，标签可单独移除或清除全部 |
-| 日分布 | 六项 Token 指标的区间图与 Min / P25 / P50 / P75 / P90 / Max；完整日金额显示有效与排除样本，精确表格及每日数值可展开 / 核对 |
-| 模型计价 | 对当前筛选的每天四类 Token 逐日重新计价；共用线性刻度区间图与全部六个金额，默认 P50 排序，可切换 P90 / Min / Max |
-| 明细 | 日级聚合完整数值、分页与排序；顶部下载图标导出当前筛选的日级 CSV |
-| 信息入口 | 顶部 ⓘ / 快照状态打开来源、价格出处与口径；图表旁 ⓘ 打开对应说明，Escape 关闭并返回焦点 |
+## 看板与分析
 
-页面明细及顶部下载按 **日期 × Harness × 模型 × 项目 × 终端 × 请求类型** 聚合，CSV 附 `knownCost`（已知小计）、`estimatedCost`（完整金额或空）、`coverage`（可计价 Token 比例）。
-同目录自动生成的 `details.csv` 与 `usage.json` 仍保留解析器原始粒度，供进一步分析；没有改变源数据或解析缓存。
-Token 四类颜色跨指标、趋势和排名保持一致；请求类型单独成图，不混成第五类 Token。排名默认前 5 项，可展开全部并在面板内滚动；长名称用省略显示，悬停或辅助技术可读取全名。页面不展示工时、生产力或分时活跃指标；会话数据仍保留在 JSON / sessions.csv。
-日期快捷项以报告截止日为准，旧报告不会随当前日期变化或自动更新。
+四个视图共用筛选条件。可组合日期、Harness、模型、项目、终端和请求类型，也可点击图表下钻，逐项移除筛选或一键重置。
 
-### 请求类型与 Harness
+| 视图 | 回答的问题 | 主要功能 |
+|---|---|---|
+| 看板 | 用了多少，主要用在哪？ | 四类 Token 构成、每日趋势、请求构成、Harness 与用量排名、典型一天 |
+| 日分布 | 平常一天与高用量日差多少？ | Min / P25 / P50 / P75 / P90 / Max、样本数量和每日数值 |
+| 模型计价 | 同样的每日用量，换一套模型费率是多少？ | 逐日重新计价、分位与极值对比；默认按 P50 排序，可切换 P90 / Min / Max |
+| 明细 | 如何核对和继续分析？ | 日级聚合、排序、分页，以及当前筛选结果的 CSV 下载 |
 
-UI 的 **Harness 对应 `source` 字段**，包括 Pi、Claude Code、Codex，也保留 Cursor 等来源；不表示都在本机运行。新的 `requestType` 与 Token 类型是两个独立维度：
+桌面并列展示核心图表，移动端改为单列。排名默认前 5 项，可展开全部；顶部和图表旁的 ⓘ 说明来源状态、价格出处和统计口径。
+
+**先看 Token，再看金额。** 请求构成图按含缓存 Token 占比展示，不是请求次数；会话时长不作为工时或生产力指标展示。
+
+<details>
+<summary>Harness、请求类型和分类证据</summary>
+
+Harness 对应数据中的 `source` 字段，表示工具来源，不表示一定在本机运行。`requestType` 与 Token 类型是两个独立维度：
 
 | requestType | 页面标签 | 口径 |
 |---|---|---|
 | `non_tool` | 非工具调用请求 | 完整响应可确认没有工具调用 |
 | `tool` | 含工具调用请求 | 响应中有工具调用或明确的工具调用结束标记；文字与调用混合也归此类 |
-| `other` | 其他（无法判定） | 旧汇总、缺少完整响应、关联不可靠或来源尚不支持分类 |
+| `other` | 其他 / 无法判定 | 缺少完整响应、关联不可靠、旧汇总或来源尚不支持分类 |
 
-整条请求的 usage 只归一类，不按工具数重复计数，也不表示工具自身消耗。构成图的占比按**含缓存 Token**计算，不是请求次数；三个入口（下拉、构成按钮、排名下钻）使用同一筛选状态。环图中央显示可分类 Token 比例，灰色明确保留其他 / 未判定。可逐项移除筛选或清除全部。
+整条请求的 usage 只归一类，不按工具数重复计数，也不表示工具自身消耗。环图中央显示可分类 Token 比例，无法判定的部分明确保留。
 
-分类支持与剩余 `other` 原因：
-
-| Harness | 可审计的分类证据 | 仍归 other 的情况 |
+| Harness | 分类证据 | 仍归 `other` 的情况 |
 |---|---|---|
-| Pi / Oh My Pi、Claude Code | 原始完整响应与工具调用；流式片段及副本保留正面工具证据，usage 只计一次 | 缺少响应或正常完成证据 |
-| Codex | 已知请求边界之间的完整 response_item 与推进的单次 token_count；新版 token_usage_record 额外核对 usage / response / turn / thread 关联 | 累计量回退、缺边界/输出、冲突 ID、损坏记录、旧账本；不把整个 turn 视为一次请求 |
-| ZCode | part.message_id 精确关联 assistant message；有 tool 优先，无 tool 且 finish=stop 才归 non_tool | 缺 part 表/字段、损坏 part、未结束或 content-filter 等结束原因 |
-| Kimi Code | 新格式匹配 step UUID / turn / step.end.usage 与 usage.record；旧格式 StepBegin / StepRetry 至完整 StatusUpdate.token_usage | 缺 step 边界、usage 不匹配、中断、无法关联的 session scope / 压缩账本；不混入子代理事件 |
-| 其他来源 | 尚未建立可靠请求级关联 | 保留 other，不猜测 |
+| Pi / Oh My Pi、Claude Code | 完整响应与工具调用；流式片段及副本保留正面工具证据，usage 只计一次 | 缺少响应或正常完成证据 |
+| Codex | 请求边界间的完整 `response_item` 与推进的单次 `token_count`；新版账本额外核对 usage / response / turn / thread 关联 | 累计量回退、缺边界或输出、冲突 ID、损坏记录、旧账本 |
+| ZCode | `part.message_id` 关联 assistant message；有 tool 优先，无 tool 且 `finish=stop` 才归非工具请求 | 缺 part 表或字段、损坏记录、未结束或 content-filter 等结束原因 |
+| Kimi Code | 新格式匹配 step UUID / turn / usage；旧格式匹配 StepBegin / StepRetry 至完整 token usage | 缺边界、usage 不匹配、中断、无法关联的 session scope / 压缩账本；不混入子代理事件 |
+| 其他来源 | 尚未建立可靠请求级关联 | 保留 `other`，不猜测 |
 
-Codex 的 token_usage_record 仅用于核对完成证据，不叠加到既有 token_count 计量，因此分类补全不改变四类 Token、去重或价格口径。解析缓存算法已升级，旧结果及增量尾缓存会自动失效。导入旧 JSON 时缺失的 `requestType` 默认归其他；更新 HTML 不能恢复旧汇总中丢失的信息，需要重新读取日志。
+Codex 的 `token_usage_record` 仅用于核对完成证据，不叠加到 `token_count` 计量，也不把整个 turn 当作一次请求。分类补全不改变四类 Token、去重或价格口径；旧解析缓存会自动失效。
 
-Min / Max 是当前样本日的最小 / 最大观测值，与四个分位同样本；目标模型逐日计价后再取极值。区间图以细线表示 Min–Max、色带表示 P25–P75、圆点表示 P50、菱形表示 P90。Token 分位各行独立刻度，模型计价共用刻度。不是单次请求极值、预算边界或未来上下限。移动端趋势按可用宽度重绘；表格可局部横向滚动，第一列保持可见。
+导入旧 JSON 时，缺失的 `requestType` 默认归其他。更新 HTML 无法恢复旧汇总中丢失的信息，需要重新读取日志。完整证据与本地补丁见 [parser attribution](vendor/vibe-usage/NOTICE.md)。
 
-## 本地价格表
+</details>
 
-随包提供 **2026-09-05 models.dev 社区价格快照**：159 个基础模型 / 318 个精确模型标识（含 provider 前缀）。
-不是从聊天中的费用拟合而来，也不声称逐条验证过厂商官网；每条记录保留提供方和文档来源。
-只取直接提供方的基础文本费率，不随意选代理商价格。运行时不会自动下载或更新价格。
+## 命令行
 
-用 `--prices` 指定本地 JSON 覆盖；**每个覆盖项必须完整提供四项费率**：
+例如，只分析三个来源最近 30 天的用量，按上海时区分组：
+
+```bash
+npx @geoqiao/pi-usage --days 30 --timezone Asia/Shanghai \
+  --sources pi-coding-agent,claude-code,codex
+```
+
+| 参数 | 用途 / 默认值 |
+|---|---|
+| `--days 90` | 包含今天的日历日数量，范围 1–3660；默认 90 |
+| `--timezone Asia/Shanghai` | 日期分组时区；默认系统 IANA 时区 |
+| `--sources pi-coding-agent,codex` | 只读取指定来源；默认全部 28 类 |
+| `--out /path/to/empty-directory` | 指定输出目录；非空目录会被拒绝，避免覆盖 |
+| `--offline` | 禁止来源网络请求；Cursor 不可用，Antigravity 仅解析本地 DB |
+| `--input /path/to/usage.json` | 从已有桶和会话重新分析，不读取数据源 |
+| `--prices /path/to/prices.json` | 用本地完整费率覆盖指定模型 |
+| `--list-sources` / `--help` | 查看来源标识 / 命令帮助 |
+
+重新分析已有数据，不重新采集：
+
+```bash
+npx @geoqiao/pi-usage --input /path/to/usage.json --days 90 --offline
+```
+
+`--input` 接受 `{ "buckets": [...], "sessions": [...] }`，忽略原有费用，按当前本地价格重新计算；其他字段不会保留，也不会自动沿用外部 CSV 的疑似重复标记。来源完整性未验证，日期窗口仍以本次执行日为截止日。
+
+## 报告与导出
+
+| 文件 | 内容 |
+|---|---|
+| `index.html` | 数据、脚本和样式全部内嵌的交互报告 |
+| `details.csv` | 解析器原始粒度的 Token 与费用明细，保留来源、模型、项目、终端和请求类型 |
+| `sessions.csv` | 会话时长、消息数、开始和结束时间 |
+| `usage.json` | 白名单字段构成的桶、会话、读取状态和价格，供再次离线分析 |
+
+页面明细和顶部 CSV 下载按 **日期 × Harness × 模型 × 项目 × 终端 × 请求类型** 聚合，导出当前筛选结果；附 `knownCost`（已知小计）、`estimatedCost`（完整金额或空）、`coverage`（可计价 Token 比例）。同目录的 `details.csv` 和 `usage.json` 保留解析器原始粒度，不会随页面筛选变化。
+
+CSV 使用 UTF-8 BOM、标准引号转义与公式注入防护，可在 Excel 中打开。POSIX 上新建报告目录权限为 0700，文件为 0600。**报告包含项目名和终端名，属于私人文件；不要放进自动同步的公共目录。**
+
+## 数据源与隐私
+
+保留 [Vibe Usage](https://github.com/vibe-cafe/vibe-usage) **0.10.21 的全部 28 个 parser**。本包独立维护，不是 VibeCafé 官方产品。
+
+| 来源类型 | 支持工具 |
+|---|---|
+| CLI / 会话日志 | Claude Code、Codex、Grok、Copilot CLI、CraftAgent、Gemini CLI、OpenClaw、Oh My Pi、Pi、Qwen Code、Kimi Code、Amp、Droid、DeepSeek Harness、Trae CLI、WorkBuddy |
+| 本地 DB / 编辑器存储 | Alma、DimAgent、OpenCode、Hermes、Kiro、MiniMax Code、MiMoCode、Cline、Roo Code、ZCode |
+| 来源服务读取 | Cursor：用本机已有登录凭据从 cursor.com 下载明细；Antigravity：本地 DB，旧版加密历史可通过 127.0.0.1 只读 RPC 获取 |
+
+**允许从来源获取数据，不允许上传采集结果。**
+
+| 边界 | 行为 |
+|---|---|
+| 网络读取 | 仅允许 Cursor 固定 GET 导出地址和 Antigravity 本机两种读取 RPC；拒绝重定向与自定义 Cursor 服务地址 |
+| 统计与日志 | 不向 VibeCafé、模型服务或遥测服务发送统计、项目名或消息正文；来源请求只携带认证所需的已有凭据 |
+| 生成报告 | 只保存白名单统计字段，不保存 prompt / 回复 / 代码正文；解析器仅在本机读取日志提取用量 |
+| HTML | 自包含，CSP 禁止连接、远程资源、表单和嵌入对象；脚本以 SHA-256 授权，无 CDN、远程字体或追踪像素 |
+| 后台行为 | 仅在主动执行命令时生成快照；不含上游上传 API、sync、账号配置或 daemon，不需要 VibeCafé API key |
+
+> 本包**不会卸载或停止已有 Vibe Usage daemon**；它若仍在运行，会继续独立上传。
+
+<details>
+<summary>来源目录、缓存、部分数据与去重</summary>
+
+继承各 parser 的默认目录、归档和去重规则。常用环境变量覆盖包括 `CODEX_HOME`、`CLAUDE_CONFIG_DIR`、`VIBE_USAGE_PI_SESSION_DIRS`；完整约定以固定版本上游代码为准。不读取 `~/.vibe-usage/config.json`，其中额外配置的根目录不会自动继承。
+
+Cindy 本地账本归并到 Codex / Pi，不新增独立来源。Codex 使用可丢弃缓存 `~/.pi/usage/cache`（可用 `PI_USAGE_CACHE_DIR` 覆盖），不碰上游上传状态。首次索引超过上游非交互预算会报告「部分数据」，再次生成可续建缓存；部分来源失败不会阻止其他来源生成报告。
+
+不同工具的数据完整度不同，部分只有 Token、没有会话；格式不支持或缺失的记录可能被跳过，无法还原已删除的日志。报告只能筛选采集窗口内的数据，日期快捷项以报告截止日为准。
+
+会话按开始日期整体归属，不跨午夜拆分。活跃秒数是日志中可观测事件的估计，并非工时；并行会话时长可能相加超过自然时间。会话没有模型、Token 或费用，不做不可靠的日期 / 项目关联。
+
+`totalTokens` 不含缓存读取，`allTokens` 包含缓存读取。复用来源级消息 / fork 去重，不使用服务端匿名副本的启发式去重，避免误删本地不同项目的相同用量。
+
+</details>
+
+## 计价口径
+
+**费用是估算，不是账单；分位描述历史样本，不预测未来。**
+
+随包提供 **2026-09-05 [models.dev](https://models.dev) 社区价格快照**：159 个基础模型、318 个精确标识（含 provider 前缀）。只取直接提供方的基础文本费率，保留来源 URL、日期与内容 SHA-256；不是从聊天费用拟合，也不声称逐条验证过厂商官网。运行时不会自动下载或更新价格。
+
+| 注意项 | 处理方式 / 限制 |
+|---|---|
+| 未定价或缺费率 | 金额为 `null`，不是零；部分定价显示已知小计与可计价 Token 比例，不将其视为真实费用覆盖率 |
+| 缓存写入与长上下文 | 缓存写入已并入输入，无法恢复其独立溢价；缺少逐请求上下文长度，无法重建阶梯价 |
+| 实际账单 | 不含媒体计费、税费、批量折扣、订阅扣款或赠送额度；快照费率用于全部历史日期 |
+| 分位样本 | 默认仅包含有用量日；「将无记录日按 0 纳入」是显式假设，不代表确认当天未使用 |
+| 金额分位 | 与 Token 分位分开；完整日金额标明有效 / 排除样本，已知金额小计不能冒充完整金额 |
+| 模型计价 | 按每天的四类 Token 重新计价，再取分位和极值；不把各类 Token 的分位乘价后相加，不推断节省、质量或生产力 |
+
+<details>
+<summary>本地费率覆盖与计算公式</summary>
+
+用 `--prices` 指定本地 JSON。**每个覆盖项必须完整提供四项费率**，单位为美元 / 百万 Token：
 
 ```json
 {
@@ -129,8 +202,7 @@ Min / Max 是当前样本日的最小 / 最大观测值，与四个分位同样�
 }
 ```
 
-单位：**美元 / 百万 token**。允许非负有限数字；`cacheRead: null` 表示缓存价格未知，遇到缓存用量时该桶不计价。
-按完整模型标识匹配，允许唯一的大小写差异；不随意删除 `#service_tier=...` 后缀或模糊猜测别名。特殊档位可按其完整标识自行覆盖。
+允许非负有限数字；`cacheRead: null` 表示缓存费率未知，遇到缓存用量时该桶不计价。按完整模型标识匹配，允许唯一的大小写差异；不会随意删除 `#service_tier=...` 后缀或猜测别名，特殊档位需按其完整标识覆盖。
 
 ```text
 estimatedCost = (inputTokens × input
@@ -139,53 +211,19 @@ estimatedCost = (inputTokens × input
                + reasoningOutputTokens × reasoning) / 1,000,000
 ```
 
-未知模型和缺失费率的费用为 `null`，不是零。完全未定价的分组显示「未定价」，部分定价明确标识；金额占比仅相对于已知小计。覆盖率按**含缓存 Token 数**计算，不代表真实费用覆盖率；不会据此自动切换排名指标。
-Token 分位与完整日金额分位分开展示，后者标出有效 / 排除日期数量及样本偏差风险，另列全部样本日的已知金额小计分布，不将其冒充完整金额。
-分位与模型计价共用日期样本，默认仅有用量日。「将无记录日按 0 纳入」是显式假设，不表示已确认当天未使用。
-模拟按每天整体重计价后求分位，**不把各类 Token 的分位乘价再相加**。目标费率齐备即可模拟原模型未定价的用量；不展示实际节省、质量或生产力推断。
+目标费率齐备时，即使原模型未定价，也可模拟其用量。Min / Max 与各分位使用同一组样本日，不是单次请求极值、预算或未来上下限。区间图用细线表示 Min–Max、色带表示 P25–P75、圆点表示 P50、菱形表示 P90；Token 各行独立刻度，模型计价共用线性刻度。
 
-### 估算限制
-
-上游将缓存写入并入 `inputTokens`，无法恢复独立缓存写入数及溢价；因此该部分只能按普通输入费率估算。
-桶也不保留每次请求的上下文长度，无法重建长上下文阶梯价。价格快照用于全部历史日期，不是历史有效期价格表。
-不含媒体计费、税费、批量折扣、实际订阅扣款、赠送额度等。覆盖率只说明能套用费率，不保证账单精度。
-
-## 数据源与隐私边界
-
-保留上游 0.10.21 的全部 **28 个 parser**：
-
-| 类别 | 工具 |
-|---|---|
-| CLI / 会话日志 | Claude Code、Codex、Grok、Copilot CLI、CraftAgent、Gemini CLI、OpenClaw、Oh My Pi、Pi、Qwen Code、Kimi Code、Amp、Droid、DeepSeek Harness、Trae CLI、WorkBuddy |
-| 本地 DB / 编辑器存储 | Alma、DimAgent、OpenCode、Hermes、Kiro、MiniMax Code、MiMoCode、Cline、Roo Code、ZCode |
-| 来源服务读取 | Cursor：用本机已登录凭据从 cursor.com 下载使用明细；Antigravity：本地 DB，旧版加密历史可通过本机 127.0.0.1 只读 RPC 获取 |
-
-另继承上游 Cindy 本地账本读取，归并到 Codex / Pi，不新增独立 source。
-继承各 parser 的默认目录、环境变量覆盖、归档和去重规则。常用覆盖如 `CODEX_HOME`、`CLAUDE_CONFIG_DIR`、`VIBE_USAGE_PI_SESSION_DIRS`；完整来源约定以固定版本上游代码为准。
-不读取 `~/.vibe-usage/config.json`，其中配置的额外根目录不会自动继承；可用对应来源环境变量设置目录。
-不同工具可提供的数据不同，部分仅有 token，没有会话。缺少或格式不支持的记录可能被上游跳过，不能承诺还原已丢失的历史。
-
-**允许获取源数据，不允许上传采集结果：**
-
-- 不包含上游 `api.js`、`sync.js`、账号配置、daemon 或上传入口，不需要 VibeCafé API key。
-- 唯一网络边界只允许 Cursor 的固定 GET 导出地址，以及 Antigravity 本机的两种读取 RPC；拒绝 HTTP 重定向和自定义 Cursor 服务地址。
-- 不把统计数据、项目名、消息内容发送给 VibeCafé、模型服务或遥测服务。Cursor 请求仅携带向该来源认证所需的已有凭据。
-- HTML 使用 CSP 禁止连接、远程资源、表单和嵌入对象；唯一脚本以 SHA-256 授权。没有 CDN、远程字体、追踪像素或外链资源。
-- `--offline` 进一步禁止所有来源网络请求；Cursor 无法读取，Antigravity 只能解析本地 DB。
-- 只保存白名单统计字段，不保存 prompt / 回复 / 代码正文。解析器会在本机读取日志来提取用量。
-
-Codex 使用独立可丢弃缓存 `~/.pi/usage/cache`（`PI_USAGE_CACHE_DIR` 可覆盖），不碰上游上传状态。
-首次索引超过上游非交互预算时会报告「部分数据」，再次生成可续建缓存。所有报告均展示读取状态，部分失败不阻止其他来源生成报告。
-没有后台采集或自动上传任务。**本 package 不卸载或停止已有 Vibe Usage daemon；它若仍在运行，会继续独立上传。**
-
-### 会话与去重
-
-会话按开始日期整体归属；时长不按跨午夜裁剪。活跃秒数是上游能观测到的首条回复至该轮最后事件的估计，并非用户工时。
-并行会话时长可能相加超过自然时间。会话没有模型、token 或费用，仅作为独立导出保留，不做不可靠的日期 / 项目 join。
-`totalTokens` 不包含缓存读取；`allTokens` 包含缓存读取，两者均单独展示。
-复用来源级消息 / fork 去重，不应用此前聊天中服务端匿名副本的启发式去重，避免误删本地不同项目的相同用量。
+</details>
 
 ## 开发与验证
+
+在仓库根目录运行，无需构建：
+
+```bash
+node packages/pi-usage/bin/pi-usage.js --days 90
+# 或将源码作为 Pi 扩展加载：
+pi install ./packages/pi-usage
+```
 
 ```bash
 pnpm --filter @geoqiao/pi-usage test
@@ -193,11 +231,12 @@ pnpm --filter @geoqiao/pi-usage typecheck
 pnpm --filter @geoqiao/pi-usage pack:check
 ```
 
-这是无构建的 JavaScript 包；`typecheck` 工作区钩子执行 JavaScript 语法检查和未修改上游文件哈希验证，不是 TypeScript 类型推导。
-`node:test` 覆盖计价 / 分位、隐私边界、CSV/HTML 安全、CLI、Pi 命令和保留的上游 parser 回归测试。
-部分上游 SQLite 测试需系统 `sqlite3`；运行时 Node 22.15+ 可使用内置 SQLite。
+这是无构建的 JavaScript 包。`typecheck` 执行语法检查和未修改上游文件的哈希验证，不是 TypeScript 类型推导。测试覆盖计价、分位、隐私、CSV / HTML 安全、CLI、Pi 命令与上游 parser 回归；部分 SQLite 测试需要系统 `sqlite3`，运行时 Node 22.15+ 可使用内置 SQLite。
 
-前端验证（合成数据，不读取个人日志）：
+<details>
+<summary>合成数据前端验证与价格快照维护</summary>
+
+前端验证不读取个人日志，使用已有 `playwright-cli`，不增加运行时依赖：
 
 ```bash
 node packages/pi-usage/scripts/demo.js /tmp/pi-usage-demo
@@ -206,17 +245,20 @@ playwright-cli -s=pi-usage run-code --filename=packages/pi-usage/scripts/browser
 playwright-cli -s=pi-usage close
 ```
 
-使用已有 `playwright-cli`，不作为运行时依赖。检查桌面 / 390px 移动端全部视图、组合筛选与下钻、键盘日期查询、信息对话框焦点、长名称与 HTML/CSV 防护、未定价与空状态、分位样本、模型计价排序、分页，以及实际 CSV 内容与筛选后原数据总量 / 日聚合条数一致。验证零外部请求；合成截图写入 `/tmp/pi-usage-bi-demo-*.png`。脚本也可验收已有报告；私有报告请在仓库外的临时目录运行浏览器，以免下载和浏览器快照进入工作区。
-更新价格需维护者先单独下载公开 `https://models.dev/api.json`，再执行：
+检查桌面与 390px 移动端、四个视图、组合筛选、下钻、键盘操作、信息对话框焦点、长名称、空状态、未定价、分页与 CSV 数值一致性，并验证零外部请求。合成截图写入 `/tmp/pi-usage-bi-demo-*.png`。验收私有报告时，请从仓库外的临时目录运行浏览器，避免下载和快照进入工作区。
+
+更新价格需维护者单独下载公开的 `https://models.dev/api.json`，再执行：
 
 ```bash
 node packages/pi-usage/scripts/prices.js /path/to/downloaded-catalog.json YYYY-MM-DD
 ```
 
-快照保留来源 URL、下载日期、内容 SHA-256；用户运行报告不会触发此流程。
+快照保留来源与哈希；用户运行报告不会触发此流程。
+
+</details>
 
 ## 许可与归属
 
-MIT。上游解析器版本、提交、原始哈希和本地补丁记录于 [NOTICE](vendor/vibe-usage/NOTICE.md)。
-价格快照来自 [models.dev](https://models.dev)，保留 [MIT license](data/models.dev-LICENSE)。
-页面是独立实现，只参考仪表盘视觉与信息布局，不包含 VibeCafé 网站代码、品牌资源或个人数据。
+[MIT](LICENSE)。解析器改编自 [Vibe Usage](https://github.com/vibe-cafe/vibe-usage)，版本、提交、原始哈希与本地补丁见 [NOTICE](vendor/vibe-usage/NOTICE.md)。价格来自 models.dev，保留其 [MIT license](data/models.dev-LICENSE)。
+
+看板为独立实现，仅参考 VibeCafé 仪表盘的视觉与信息布局，未复用其网站代码、品牌资源或用户数据。本包与 VibeCafé 无官方关联。
