@@ -73,11 +73,42 @@ npx skills add geoqiao/pi-tools --skill paseo-btw --agent '*' -g
 
 [Read the package guide →](packages/paseo-btw)
 
+---
+
 ### Keep usage private — [`@geoqiao/pi-usage`](packages/pi-usage)
 
-Analyze 28 AI coding data sources locally and generate a self-contained HTML dashboard with
-filters, token/cost trends, percentiles, model cost simulations, and CSV exports. Source retrieval
-may use the network; collected usage is never uploaded. Includes `/usage-report` and a standalone CLI.
+[![npm version](https://img.shields.io/npm/v/@geoqiao/pi-usage?color=cb3837)](https://www.npmjs.com/package/@geoqiao/pi-usage)
+[![npm downloads](https://img.shields.io/npm/dm/@geoqiao/pi-usage)](https://www.npmjs.com/package/@geoqiao/pi-usage)
+[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A5%2022.15-417e38)](https://nodejs.org/)
+
+See where your AI coding tokens and estimated costs go. Analyze 28 data sources locally and
+open a self-contained HTML dashboard—no account, background service, or web server required.
+Source retrieval may use the network; collected usage is never uploaded. Costs are estimates,
+not actual bills.
+
+| Explore | What you get |
+|---|---|
+| Usage dashboard | Date, tool, model, and project filters with token/cost trends |
+| Daily distributions | Percentiles for typical and high-usage days |
+| Model pricing | Compare the same usage under different model rates |
+| Export and review | CSV / JSON exports and offline HTML snapshots |
+
+Install in Pi, then run `/usage-report` (or `/usage-report 30` for the last 30 days):
+
+```bash
+pi install npm:@geoqiao/pi-usage
+```
+
+Requires Node.js ≥ 22.15. Run `/reload` in an already-open Pi session. You can also generate a
+report without Pi:
+
+```bash
+npx @geoqiao/pi-usage --days 90
+```
+
+<a href="packages/pi-usage">
+  <img src="packages/pi-usage/docs/media/pi-usage-dashboard.png" alt="Pi Usage dashboard with token trends, usage rankings, and filters" width="900">
+</a>
 
 [Read the package guide →](packages/pi-usage)
 
@@ -109,6 +140,7 @@ Run a focused check with a package filter:
 ```bash
 pnpm --filter @geoqiao/pi-ask test
 pnpm --filter @geoqiao/paseo-btw test
+pnpm --filter @geoqiao/pi-usage test
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution and release workflow.
