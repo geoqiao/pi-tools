@@ -51,7 +51,11 @@ export function createPiExecutionCollector(source) {
         } else if (c.name === 'wait') {
           r.waitIds.add(c.id);
           const cell = id(c.arguments?.cell_id);
-          if (cell) unit = cells.get(scope(sessionId,cell));
+          const previousCall = calls.get(scope(sessionId,c.id));
+          // Replayed copies of the same wait retain their association, but a new
+          // wait may only attach to a runtime cell still open in this file.
+          if (previousCall?.response === r && previousCall.name === 'wait') unit = previousCall.unit;
+          else if (cell) unit = cells.get(scope(sessionId,cell));
         }
         calls.set(scope(sessionId,c.id),{response:r,unit,name:c.name});
       }
@@ -80,7 +84,9 @@ export function createPiExecutionCollector(source) {
     }
     unit.cellId = d.cellId;
     unit.code = true; unit.owner.codeEvidence = true; found.response.codeEvidence = true;
-    if (found.name === 'exec') cells.set(scope(sessionId,d.cellId),unit);
+    const cellKey = scope(sessionId,d.cellId);
+    if (d.status === 'yielded') cells.set(cellKey,unit);
+    else if (cells.get(cellKey) === unit) cells.delete(cellKey);
     const traces = d.traces === undefined ? [] : d.traces;
     const dropped = d.droppedTraceCount === undefined ? 0 : count(d.droppedTraceCount);
     const snapshot = new Set();

@@ -167,3 +167,35 @@ test('pending dropped counts form a lower bound and contradictory final counters
   assert.deepEqual(terminal.execHistogram, {});
   assert.equal(terminal.incompleteToolCalls, 11);
 });
+
+test('a new wait after completion cannot invalidate a previously exact exec', () => {
+  const { rows } = feed([
+    assistant('a', [call('e')]),
+    result('e', { codeMode: true, cellId: 'x', status: 'result', traces: [trace('t')] }),
+    assistant('b', [call('late-wait', 'wait', { cell_id: 'x' })]),
+    result('late-wait', {}, { isError: true }),
+  ]);
+  assert.deepEqual(rows[0].execHistogram, { 1: 1 });
+  assert.equal(rows[0].outerExecErrors, 0, 'An unrelated late wait error is not an exec failure');
+  assert.equal(rows[1].waitCalls, 1);
+});
+
+test('copied continuations and repeated final wait records keep their original association', () => {
+  const c = createPiExecutionCollector('pi-coding-agent');
+  for (let copy = 0; copy < 2; copy++) {
+    c.beginFile();
+    for (const entry of [
+      assistant('a', [call('e')]),
+      result('e', { codeMode: true, cellId: 'x', status: 'yielded', traces: [trace('t')] }),
+      assistant('b', [call('w', 'wait', { cell_id: 'x' })]),
+      result('w', { codeMode: true, cellId: 'x', status: 'result', traces: [trace('t'), trace('t2')] }),
+      assistant('b', [call('w', 'wait', { cell_id: 'x' })]),
+      result('w', { codeMode: true, cellId: 'x', status: 'result', traces: [trace('t'), trace('t2')] }),
+    ]) c.observe(entry, ctx);
+  }
+  const { rows, warnings } = c.finish();
+  assert.deepEqual(rows[0].execHistogram, { 2: 1 });
+  assert.equal(rows.length, 2);
+  assert.equal(rows[1].waitCalls, 1);
+  assert.deepEqual(warnings, []);
+});
