@@ -11,12 +11,12 @@ const HELP = `pi-usage — 获取使用数据，本地生成分析报告；不�
   --sources pi-coding-agent,codex  只采集指定工具（默认全部 28 类）
   --prices /path/prices.json      本地价格覆盖：{ "models": { "model-id": { "input": 5, "cacheRead": 0.5, "output": 30, "reasoning": 30 } } }
   --timezone Asia/Shanghai        日期分组时区（默认系统时区）
-  --input /path/usage.json        从本地 buckets / sessions 重新分析，不采集数据源
+  --input /path/usage.json        从本地 buckets / sessions / execution 重新分析，不采集数据源
   --offline                      禁止来源网络请求（Cursor 不可用；Antigravity 仅本地 DB）
   --list-sources                  列出数据源
   --help                         查看帮助
 
-报告为独立 HTML，双击打开；同目录包含 details.csv、sessions.csv、usage.json。
+报告为独立 HTML，双击打开；同目录包含 details.csv、sessions.csv、execution.csv、usage.json。
 成本为价格快照下的估算，不是账单；未定价模型不会按 0 元计算。
 `;
 
@@ -53,8 +53,9 @@ async function main(args = process.argv.slice(2)) {
   }
   data.buckets = data.buckets.filter(row => row.date >= from && row.date <= to);
   data.sessions = data.sessions.filter(row => row.date >= from && row.date <= to);
+  data.execution = data.execution.filter(row => row.date >= from && row.date <= to);
   const report = {
-    schemaVersion: 1, generatedAt: now.toISOString(), from, to, timeZone,
+    schemaVersion: 2, generatedAt: now.toISOString(), from, to, timeZone,
     priceSnapshot: { date: snapshot.snapshotDate, source: snapshot.source, overrideCount: Object.keys(overrides).length },
     prices, ...data,
   };

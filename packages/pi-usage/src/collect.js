@@ -6,7 +6,7 @@ import { normalizeData } from './analytics.js';
 export const SOURCES = Object.keys(parsers);
 
 export async function collect({ sources = SOURCES, timeZone, prices, onProgress = () => {} }) {
-  const result = { buckets: [], sessions: [], statuses: [] };
+  const result = { buckets: [], sessions: [], execution: [], statuses: [] };
   for (const source of sources) {
     if (!Object.hasOwn(parsers, source)) throw new Error(`未知数据源：${source}`);
     onProgress(source);
@@ -15,8 +15,9 @@ export async function collect({ sources = SOURCES, timeZone, prices, onProgress 
       const data = normalizeData(raw, { timeZone, prices, hostname: hostname() });
       result.buckets.push(...data.buckets);
       result.sessions.push(...data.sessions);
+      result.execution.push(...data.execution);
       result.statuses.push({
-        source, state: raw.skipped ? 'partial' : data.buckets.length || data.sessions.length ? 'ok' : 'empty',
+        source, state: raw.skipped ? 'partial' : data.buckets.length || data.sessions.length || data.execution.length ? 'ok' : 'empty',
         buckets: data.buckets.length, sessions: data.sessions.length,
         warningCount: raw.warnings.length,
         // Do not embed arbitrary upstream exception strings or private filesystem paths.

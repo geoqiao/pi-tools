@@ -1,5 +1,5 @@
 async page => {
-  // Run on demo.js output, or an existing private report. Return aggregates only.
+  // Run only on synthetic demo/legacy fixture output; never use a private report or real session export for fixtures/screenshots.
   const errors = [], requests = [];
   const onError = error => errors.push(error.message);
   const onRequest = request => { if (/^https?:/.test(request.url())) requests.push(request.url()); };
@@ -14,7 +14,16 @@ async page => {
     const data = JSON.parse(document.querySelector('script').textContent.match(/const DATA = ([\s\S]*?);\nconst \$/)[1]);
     const rows = data.buckets.filter(r => r.date >= data.from && r.date <= data.to);
     const typeTotals = Object.fromEntries(['non_tool', 'tool', 'other'].map(k => [k, rows.filter(r => (r.requestType ?? 'other') === k).reduce((n, r) => n + r.allTokens, 0)]));
-    return { total: rows.reduce((n, r) => n + r.allTokens, 0), typeTotals, models: new Set(rows.map(r => r.model)).size, demo: rows.some(r => r.model === 'unknown-preview') };
+    const execution = (data.execution ?? []).filter(r => r.date >= data.from && r.date <= data.to), histogram = {};
+    let execCalls = 0, completeExecs = 0, multiToolSamples = 0, pendingExecs = 0, unknownExecs = 0;
+    for (const row of execution) {
+      execCalls += row.execCalls; pendingExecs += row.pendingExecs; unknownExecs += row.unknownExecs;
+      for (const [value, count] of Object.entries(row.execHistogram ?? {})) { histogram[value] = (histogram[value] ?? 0) + count; completeExecs += count; if (Number(value) >= 2) multiToolSamples += count; }
+    }
+    const exactBins = [0, 1, 2, 3, 4].map(value => histogram[value] ?? 0);
+    exactBins.push(Object.entries(histogram).reduce((n, [value, count]) => n + (Number(value) >= 5 ? count : 0), 0));
+    const executionOnlyModel = [...new Set(execution.map(r => r.model))].find(model => !new Set(rows.map(r => r.model)).has(model));
+    return { total: rows.reduce((n, r) => n + r.allTokens, 0), typeTotals, models: new Set(rows.map(r => r.model)).size, demo: rows.some(r => r.model === 'unknown-preview'), execution: { responseCount: execution.length, execCalls, completeExecs, multiToolSamples, multiToolRate: completeExecs ? multiToolSamples / completeExecs : null, pendingExecs, unknownExecs, exactBins, executionOnlyModel } };
   });
   const total = async () => Number(await page.locator('#total-value').getAttribute('data-value'));
   const initialCount = await page.locator('#page-status').textContent();
@@ -88,6 +97,47 @@ async page => {
     return { total: Object.values(totals).reduce((a, b) => a + b, 0), types: totals };
   });
   check(fullCsv.total === expected.total && Object.keys(expected.typeTotals).every(k => fullCsv.types[k] === expected.typeTotals[k]), 'Full CSV total or classification changed');
+  await view('execution');
+  if (expected.execution.responseCount) {
+    check(await page.locator('#execution-empty').isHidden(), 'Execution evidence was incorrectly empty');
+    check(await page.locator('#execution-response-value').textContent() === String(expected.execution.responseCount), 'Recorded response count differs from snapshot');
+    check((await page.locator('#execution-response-value').evaluate(el => el.parentElement.textContent)).includes('不等于完整 HTTP/API 请求或计费次数'), 'Assistant response disclaimer missing');
+    const expectedMultiToolRate = expected.execution.multiToolRate == null ? '—' : `${(expected.execution.multiToolRate * 100).toFixed(1)}%`;
+    check(await page.locator('#execution-batch-value').textContent() === expectedMultiToolRate, 'Batch coverage is not the histogram-derived multiToolRate');
+    check((await page.locator('#execution-batch-note').textContent()).includes(`${expected.execution.multiToolSamples} / ${expected.execution.completeExecs}`), 'Batch coverage denominator is not complete exec samples');
+    check(await page.locator('#execution-histogram .execution-bin').count() === 6, 'Execution histogram bins missing');
+    const histogram = await page.locator('#execution-histogram .execution-bin-value').allTextContents();
+    check(histogram.every((value, index) => Number(value.replaceAll(',', '')) === expected.execution.exactBins[index]), 'Execution histogram did not merge exact samples');
+    await page.locator('#execution-trend-metric').selectOption('medianTools');
+    check(await page.locator('#execution-trend .execution-missing-mark').count() > 0, 'Missing execution trend days have no visible non-numeric marker');
+    await page.locator('#execution-trend-metric').selectOption('meanTools');
+    check((await page.locator('#execution-evidence').textContent()).includes(`pending exec${expected.execution.pendingExecs}`), 'Pending coverage missing');
+    check((await page.locator('#execution-evidence').textContent()).includes(`unknown exec${expected.execution.unknownExecs}`), 'Unknown coverage missing');
+    check(await page.locator('#execution-model-table tbody tr').count() > 0 && await page.locator('#execution-session-table tbody tr').count() > 0, 'Model/session execution tables missing');
+    check(await page.locator('#execution-session-table tbody tr').count() <= 20 && await page.locator('#execution-session-toggle').isVisible(), 'Session table is not bounded');
+    await page.locator('#execution-session-toggle').click();
+    check(await page.locator('#execution-session-table tbody tr').count() > 20, 'Session table expand failed');
+    await page.locator('#execution-session-toggle').click();
+    check(await page.locator('#model option').allTextContents().then(values => values.includes(expected.execution.executionOnlyModel)), 'Execution-only model missing from shared filters');
+    const executionDownload = page.waitForEvent('download');
+    await page.locator('#execution-export').click();
+    const executionFile = await executionDownload;
+    check(executionFile.suggestedFilename().startsWith('pi-usage-execution-'), 'Wrong execution CSV filename');
+    check(await executionFile.failure() === null, 'Execution CSV download blocked');
+    if (expected.execution.executionOnlyModel) {
+      await page.locator('#model').selectOption(expected.execution.executionOnlyModel);
+      check(await page.locator('#execution-empty').isHidden(), 'Execution-only model was filtered out');
+      check(await page.locator('#empty-state').isVisible(), 'Legacy empty state lost for execution-only model');
+      await page.locator('#reset').click();
+    }
+  } else {
+    check(await page.locator('#execution-empty').isVisible(), 'Missing execution empty state');
+  }
+  await page.locator('#reset').click();
+  await view('execution');
+  await page.screenshot({ path: '/tmp/pi-usage-bi-demo-execution.png' });
+  await page.locator('#reset').click();
+  await view('overview');
   if (expected.demo) {
     await page.locator('#distribution-dimension').selectOption('model');
     await page.locator('#distribution-metric').selectOption('knownCost');
@@ -121,7 +171,7 @@ async page => {
   check((await page.locator('#sample-note').textContent()).includes('假设'), 'Zero assumption not disclosed');
   await page.locator('#include-zero').uncheck();
   check((await page.locator('#cost-sample-note').textContent()).includes('排除'), 'Cost exclusions not disclosed');
-  await page.screenshot({ path: `/tmp/pi-usage-bi-${expected.demo ? 'demo' : 'real'}-percentiles.png` });
+  await page.screenshot({ path: '/tmp/pi-usage-bi-demo-percentiles.png' });
   await view('simulation');
   for (const sort of ['p90', 'min', 'max', 'p50']) {
     await page.locator('#simulation-sort').selectOption(sort);
@@ -130,7 +180,7 @@ async page => {
     const numbers = amounts.filter(s => s !== '—').map(s => Number(s.replace(/[$,]/g, '')));
     check(numbers.every((v, i) => !i || v >= numbers[i - 1]), `Simulation ${sort} order incorrect`);
   }
-  await page.screenshot({ path: `/tmp/pi-usage-bi-${expected.demo ? 'demo' : 'real'}-simulation.png` });
+  await page.screenshot({ path: '/tmp/pi-usage-bi-demo-simulation.png' });
   await view('overview');
   await page.locator('#trend-metric').selectOption('cost');
   check((await page.locator('#trend-legend').textContent()).includes('金额'), 'Cost legend mismatch');
@@ -141,6 +191,7 @@ async page => {
   await page.locator('#from').fill('');
   await page.locator('#from').dispatchEvent('change');
   check(await page.locator('#export').isDisabled(), 'Invalid dates allowed misleading export');
+  check(await page.locator('#execution-export').isDisabled(), 'Invalid dates allowed execution export');
   check(await total() === expected.total, 'Invalid dates changed valid result');
   await page.locator('#reset').click();
   await view('records');
@@ -161,9 +212,9 @@ async page => {
   await page.locator('#trend-metric').selectOption('tokens');
   check(await page.locator('svg[onload], img, iframe').count() === 0, 'Unescaped HTML or external resource');
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.screenshot({ path: `/tmp/pi-usage-bi-${expected.demo ? 'demo' : 'real'}-desktop.png` });
+  await page.screenshot({ path: '/tmp/pi-usage-bi-demo-desktop.png' });
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const name of ['overview', 'percentiles', 'simulation', 'records']) {
+  for (const name of ['overview', 'percentiles', 'simulation', 'records', 'execution']) {
     await view(name);
     check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Mobile overflow in ${name}`);
   }
@@ -176,7 +227,7 @@ async page => {
     await page.locator('#distribution-dimension').selectOption('model');
   }
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.screenshot({ path: `/tmp/pi-usage-bi-${expected.demo ? 'demo' : 'real'}-mobile.png`, fullPage: true });
+  await page.screenshot({ path: '/tmp/pi-usage-bi-demo-mobile.png', fullPage: true });
   check(await page.locator('#trend svg').getAttribute('viewBox').then(v => Number(v.split(' ')[2]) < 400), 'Mobile trend was not resized');
   await page.setViewportSize({ width: 1440, height: 1050 });
   check(errors.length === 0, errors.join('\n'));

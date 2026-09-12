@@ -1,4 +1,5 @@
 // Shared by Node and the self-contained report. No filesystem or network access.
+import { normalizeExecutionRows } from './execution.js';
 export const TOKEN_FIELDS = ['inputTokens', 'cachedInputTokens', 'outputTokens', 'reasoningOutputTokens'];
 export const DIMENSIONS = ['source', 'model', 'project', 'hostname', 'requestType'];
 export const REQUEST_TYPES = { non_tool: '非工具调用请求', tool: '含工具调用请求', other: '其他（无法判定）' };
@@ -104,7 +105,7 @@ export function normalizeData(raw, { timeZone, hostname = 'unknown', prices }) {
     for (const k of ['durationSeconds', 'activeSeconds', 'messageCount', 'userMessageCount']) s[k] = count(row[k] ?? 0);
     return s;
   });
-  return { buckets, sessions };
+  return { buckets, sessions, execution: normalizeExecutionRows(raw.execution, { timeZone, hostname }) };
 }
 
 export function summarize(rows) {

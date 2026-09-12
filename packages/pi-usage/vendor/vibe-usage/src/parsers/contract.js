@@ -2,7 +2,7 @@
  * Parser result contract.
  *
  * Every parser exports an async parse() returning either
- *   { buckets: object[], sessions: object[], skipped?: boolean, warnings?: string[], indexing?: object }
+ *   { buckets: object[], sessions: object[], execution?: object[], skipped?: boolean, warnings?: string[], indexing?: object }
  * or a legacy bare buckets array.
  *
  * buckets entries are the aggregateToBuckets() output shape
@@ -19,11 +19,12 @@
  *
  * @param {string} source registry key
  * @param {unknown} result raw return value
- * @returns {{ buckets: object[], sessions: object[], skipped: boolean, warnings: string[], indexing?: object }}
+ * @returns {{ buckets: object[], sessions: object[], execution?: object[], skipped: boolean, warnings: string[], indexing?: object }}
  */
 export function normalizeParserResult(source, result) {
   const buckets = Array.isArray(result) ? result : result?.buckets;
   const sessions = Array.isArray(result) ? [] : (result?.sessions || []);
+  const execution = Array.isArray(result) ? undefined : result?.execution;
   if (!Array.isArray(buckets) || !Array.isArray(sessions)) {
     throw new TypeError('Parser returned an invalid result');
   }
@@ -44,10 +45,14 @@ export function normalizeParserResult(source, result) {
   }
 
   const warnings = Array.isArray(result?.warnings) ? result.warnings.slice() : [];
+  if (execution !== undefined && (!Array.isArray(execution) || execution.some(row => row?.source !== source))) {
+    throw new TypeError('Parser returned invalid execution evidence');
+  }
 
   return {
     buckets,
     sessions,
+    ...(execution !== undefined ? { execution } : {}),
     skipped: result?.skipped === true,
     warnings,
     ...(result?.indexing ? { indexing: result.indexing } : {}),

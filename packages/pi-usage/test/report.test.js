@@ -15,12 +15,14 @@ test('CLI local import -> HTML/JSON/CSV, refuses overwrites and validates option
     await writeFile(input, JSON.stringify({ buckets: [{ source: 'pi-coding-agent', model: 'gpt-5.4', project: 'private-project', bucketStart: new Date().toISOString(), inputTokens: 1000000, prompt: 'NEVER_EXPORT_ME' }], sessions: [], apiKey: 'NEVER_EXPORT_ME' }));
     const result = execFileSync(process.execPath, [cli, '--input', input, '--out', out, '--offline'], { encoding: 'utf8' });
     assert.equal(result.trim(), join(out, 'index.html'));
-    for (const name of ['usage.json', 'index.html', 'details.csv', 'sessions.csv']) {
+    for (const name of ['usage.json', 'index.html', 'details.csv', 'sessions.csv', 'execution.csv']) {
       const content = await readFile(join(out, name), 'utf8');
       assert.ok(!content.includes('NEVER_EXPORT_ME'));
       if (process.platform !== 'win32') assert.equal((await stat(join(out, name))).mode & 0o777, 0o600);
     }
     const report = JSON.parse(await readFile(join(out, 'usage.json'), 'utf8'));
+    assert.equal(report.schemaVersion, 2);
+    assert.deepEqual(report.execution, [], 'Legacy imports have no execution evidence');
     assert.equal(report.buckets.length, 1);
     assert.ok(report.buckets[0].estimatedCost > 0);
     assert.throws(() => execFileSync(process.execPath, [cli, '--input', input, '--out', out], { stdio: 'pipe' }), /输出目录必须为空/);

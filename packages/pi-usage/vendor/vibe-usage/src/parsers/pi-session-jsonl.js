@@ -3,6 +3,7 @@ import { basename, join, relative } from 'node:path';
 import { aggregateToBuckets, extractSessions } from './aggregate.js';
 import { projectFromCwd, toCount } from './fs-utils.js';
 import { requestTypeFor, mergeRequestTypes } from '../../../../src/analytics.js';
+import { createPiExecutionCollector } from '../../../../src/pi-execution.js';
 
 const MAX_WARNINGS = 20;
 
@@ -64,6 +65,7 @@ export async function parsePiSessionJsonl({
   const eventsById = new Map();
   const anonymousEvents = [];
   const seenFiles = new Set();
+  const execution = source === 'pi-coding-agent' ? createPiExecutionCollector(source) : null;
 
   for (const sessionsDir of sessionsDirs) {
     for (const filePath of findJsonlFiles(sessionsDir, includeFile, ctx)) {
@@ -81,6 +83,7 @@ export async function parsePiSessionJsonl({
 
       let sessionId = basename(filePath, '.jsonl');
       let project = projectFromPath(filePath, sessionsDir) || 'unknown';
+      execution?.beginFile();
 
       for (const line of content.split('\n')) {
         if (!line.trim()) continue;
@@ -102,6 +105,7 @@ export async function parsePiSessionJsonl({
         const timestamp = new Date(obj.timestamp || message.timestamp || 0);
         if (Number.isNaN(timestamp.getTime())) continue;
         const recordId = obj.id ? `${sessionId}:${obj.id}` : null;
+        execution?.observe(obj, { sessionId, project });
 
         if (message.role === 'user' || message.role === 'assistant' || message.role === 'toolResult') {
           const event = {
@@ -157,9 +161,12 @@ export async function parsePiSessionJsonl({
     ...[...entriesById.values()].map(({ entry }) => entry),
   ];
   const events = [...anonymousEvents, ...eventsById.values()];
+  const executionResult = execution?.finish();
+  if (executionResult) ctx.warnings.push(...executionResult.warnings);
   return {
     buckets: aggregateToBuckets(entries),
     sessions: extractSessions(events),
+    ...(executionResult ? { execution: executionResult.rows } : {}),
     ...(ctx.incomplete ? { skipped: true } : {}),
     ...(ctx.warnings.length > 0 ? { warnings: ctx.warnings } : {}),
   };
