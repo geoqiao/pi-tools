@@ -17,6 +17,7 @@ const HELP = `pi-usage — 获取使用数据，本地生成分析报告；不�
   --help                         查看帮助
 
 报告为独立 HTML，双击打开；同目录包含 details.csv、sessions.csv、execution.csv、usage.json。
+日期快捷筛选只使用报告已采集范围；需要更多天数或来源时请重新生成报告。
 成本为价格快照下的估算，不是账单；未定价模型不会按 0 元计算。
 `;
 
@@ -56,6 +57,11 @@ async function main(args = process.argv.slice(2)) {
   data.execution = data.execution.filter(row => row.date >= from && row.date <= to);
   const report = {
     schemaVersion: 2, generatedAt: now.toISOString(), from, to, timeZone,
+    collectionScope: {
+      kind: values.input ? 'import' : values.sources ? 'selected' : 'all',
+      sources: values.input ? [...new Set([...data.buckets, ...data.sessions, ...data.execution].map(row => row.source))].sort() : [...selected],
+      offline: process.env.PI_USAGE_OFFLINE === '1',
+    },
     priceSnapshot: { date: snapshot.snapshotDate, source: snapshot.source, overrideCount: Object.keys(overrides).length },
     prices, ...data,
   };

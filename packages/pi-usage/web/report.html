@@ -11,13 +11,13 @@
 <a class="skip" href="#main">跳至分析看板</a>
 <header class="app-header">
   <a class="brand" href="#overview"><span class="brand-mark">π</span><span>Usage<span class="brand-sub">LOCAL ANALYTICS</span></span></a>
-  <nav class="views" aria-label="分析视图"><button data-view="overview" aria-pressed="true"><span data-icon="dashboard"></span>看板</button><button data-view="percentiles" aria-pressed="false"><span data-icon="range"></span>日分布</button><button data-view="simulation" aria-pressed="false"><span data-icon="compare"></span>模型计价</button><button data-view="records" aria-pressed="false"><span data-icon="table"></span>明细</button><button data-view="execution" aria-pressed="false"><span data-icon="pulse"></span>执行效率</button></nav>
+  <nav class="views" aria-label="分析视图"><button data-view="overview" aria-pressed="true"><span data-icon="dashboard"></span>看板</button><button data-view="percentiles" aria-pressed="false"><span data-icon="range"></span>日分布</button><button data-view="simulation" aria-pressed="false"><span data-icon="compare"></span>模型计价</button><button data-view="records" aria-pressed="false"><span data-icon="table"></span>明细</button></nav>
   <div class="actions"><button id="export" class="icon-button" data-icon="download" aria-label="导出当前筛选的日级明细 CSV" title="导出当前筛选的日级明细 CSV"></button><button id="print" class="icon-button" data-icon="print" aria-label="打印当前视图 / PDF" title="打印当前视图 / PDF"></button><button id="info" class="icon-button" data-icon="info" aria-label="来源状态、价格与统计口径" title="来源状态、价格与统计口径"></button></div>
 </header>
 <main id="main">
   <section class="filters" aria-label="组合筛选">
     <div class="date-filter"><span data-icon="calendar"></span><input type="date" id="from" aria-label="开始日期"><span class="muted">—</span><input type="date" id="to" aria-label="结束日期"></div>
-    <div class="presets" aria-label="截至报告日期的范围"><button data-days="7">7D</button><button data-days="30">30D</button><button data-days="90">90D</button><button data-days="all">全部</button></div>
+    <div class="presets" aria-label="截至报告日期的范围"><button data-days="7">7D</button><button data-days="30">30D</button><button data-days="90">90D</button><button data-days="all">全部</button></div><span id="preset-note" class="preset-note" role="status" aria-live="polite"></span>
     <span class="filter-spacer"></span><button id="reset" class="icon-button" data-icon="reset" aria-label="重置全部筛选" title="重置全部筛选"></button>
     <div class="dimension-filters">
       <label><span data-icon="terminal"></span><span>Harness</span><select id="source"><option value="">全部</option></select></label>
@@ -27,36 +27,99 @@
       <label><span data-icon="branch"></span><span>请求</span><select id="requestType" aria-label="请求类型"><option value="">全部</option></select></label>
     </div>
   </section>
-  <div class="scope-line"><p id="filter-status" role="status" aria-live="polite"></p><button id="snapshot" class="text-button" title="查看数据快照和来源状态"><span class="status-dot"></span><span id="snapshot-label">本地快照</span><span data-icon="info"></span></button></div>
+  <div class="scope-line"><p id="filter-status" role="status" aria-live="polite"></p><div class="scope-meta"><span id="collection-scope" class="scope-badge"></span><button id="snapshot" class="text-button" title="查看数据快照和来源状态"><span class="status-dot"></span><span id="snapshot-label">本地快照</span><span data-icon="info"></span></button></div></div>
   <div id="breadcrumbs" class="breadcrumbs" aria-label="当前筛选，可逐项移除"></div>
-  <section id="metrics" class="metrics" aria-label="当前筛选的用量">
-    <div class="total-metric"><span class="eyebrow">TOKEN <span class="muted">/ 含缓存</span></span><strong id="total-value" class="number">—</strong><span id="net-value" class="metric-note"></span><div id="token-ribbon" class="token-ribbon" aria-hidden="true"></div></div>
+  <section id="metrics" class="metrics" aria-label="01 整体用量 · 当前筛选">
+    <div class="total-metric"><span class="eyebrow">TOKEN（M）<span class="muted">/ 含缓存</span></span><strong id="total-value" class="number">—</strong><span id="net-value" class="metric-note"></span><div id="token-ribbon" class="token-ribbon" aria-hidden="true"></div></div>
     <div id="composition" class="composition"></div>
     <div class="cost-metric"><span id="cost-label" class="eyebrow">估算 · USD</span><strong id="cost-value" class="number">—</strong><div class="coverage-track" aria-hidden="true"><span id="coverage-bar"></span></div><span id="coverage-value" class="metric-note"></span></div>
   </section>
   <div id="empty-state" class="empty" hidden>当前筛选没有用量记录。调整筛选或重置即可继续。</div>
   <section id="overview" class="view" aria-label="用量看板">
-    <div class="dashboard-grid">
+    <div class="overview-section overview-primary" data-section="1">
+      <div class="section-heading"><span class="section-index">01</span><div><h1>整体用量</h1><p>总 Token（含缓存）与报告截止日前的每日趋势</p></div></div>
       <section class="panel trend-panel">
-        <div class="panel-head"><h1><span data-icon="trend"></span>每日趋势</h1><div class="actions"><span id="activity-count" class="badge"></span><select id="trend-metric" aria-label="趋势指标"><option value="tokens">Token 构成</option><option value="inputTokens">输入（含缓存写）</option><option value="cachedInputTokens">缓存读取</option><option value="outputTokens">输出</option><option value="reasoningOutputTokens">推理</option><option value="cost">已知估算金额</option></select><button class="icon-button small" data-help="trend" data-icon="info" aria-label="趋势图说明"></button></div></div>
+        <div class="panel-head"><h1><span data-icon="trend"></span>每日趋势</h1><div class="actions"><span id="activity-count" class="badge"></span><select id="trend-metric" aria-label="趋势指标"><option value="tokens">Token 构成（M）</option><option value="inputTokens">输入（M，含缓存写）</option><option value="cachedInputTokens">缓存读取（M）</option><option value="outputTokens">输出（M）</option><option value="reasoningOutputTokens">推理（M）</option><option value="cost">已知估算金额</option></select><button class="icon-button small" data-help="trend" data-icon="info" aria-label="趋势图说明"></button></div></div>
         <div id="trend"></div><div class="chart-footer"><div id="trend-legend" class="legend"></div><span class="muted">点击日期下钻</span></div>
       </section>
-      <section class="panel request-panel">
-        <div class="panel-head"><h2><span data-icon="branch"></span>请求构成</h2><button class="icon-button small" data-help="request" data-icon="info" aria-label="请求类型分类口径"></button></div>
-        <div class="request-visual"><div id="request-ring"></div><div id="request-summary" aria-label="按请求类型筛选"></div></div><div id="classification-note" class="panel-foot"></div>
+    </div>
+    <div class="overview-section overview-breakdown" data-section="2">
+      <div class="section-heading"><span class="section-index">02</span><div><h1>用量分布</h1><p>Harness、含工具响应的 Token 分类、模型与典型一天</p></div></div>
+      <div class="dashboard-grid breakdown-grid">
+        <section class="panel request-panel">
+          <div class="panel-head"><h2><span data-icon="branch"></span>Tool-call 用量分类</h2><button class="icon-button small" data-help="request" data-icon="info" aria-label="请求类型分类口径"></button></div>
+          <div class="request-visual"><div id="request-ring"></div><div id="request-summary" aria-label="按请求类型筛选"></div></div><div id="classification-note" class="panel-foot"></div>
+        </section>
+        <section class="panel harness-panel"><div class="panel-head"><h2><span data-icon="terminal"></span>Harness 分布</h2><span id="harness-count" class="badge"></span></div><div id="harness-ranking" class="ranking"></div><div class="panel-foot">含缓存 Token（M） · 点击联动筛选</div></section>
+        <section class="panel ranking-panel">
+          <div class="panel-head"><h2><span data-icon="layers"></span>模型分布</h2><div class="actions"><select id="distribution-dimension" aria-label="分布维度"><option value="model">模型</option><option value="project">项目</option><option value="hostname">终端</option><option value="source">Harness</option><option value="requestType">请求类型</option></select><select id="distribution-metric" aria-label="分布指标"><option value="allTokens">Token（M）</option><option value="inputTokens">输入（M）</option><option value="cachedInputTokens">缓存读（M）</option><option value="outputTokens">输出（M）</option><option value="reasoningOutputTokens">推理（M）</option><option value="knownCost">已知金额</option></select></div></div>
+          <div id="distributions" class="ranking"></div><div class="panel-foot"><span id="ranking-note"></span><button id="show-all" class="text-button" aria-expanded="false">全部</button></div>
+        </section>
+        <section class="panel daily-panel"><div class="panel-head"><h2><span data-icon="range"></span>典型一天</h2><button class="icon-button small" data-view="percentiles" data-icon="expand" aria-label="展开每日分位分析" title="展开每日分位分析"></button></div><div class="daily-hero"><div><span class="eyebrow">P50 · TOKEN / 日（M）</span><strong id="daily-median" class="number">—</strong></div><span id="daily-sample" class="badge"></span></div><div id="daily-histogram"></div><div id="daily-range"></div><div id="daily-stats" class="summary-stats"></div><div class="panel-foot">仅描述样本 · 不预测未来</div></section>
+      </div>
+    </div>
+    <div class="overview-section overview-cost" data-section="3">
+      <span id="execution" class="legacy-view-anchor" aria-hidden="true"></span>
+      <div class="section-heading"><span class="section-index">03</span><div><h1>Code Mode 成本影响</h1><p>在给定缓存与批量假设下，估算直接调用的成本差额</p></div><span class="section-badge">情景估算 · 非账单</span></div>
+      <section id="code-mode-counterfactual" class="panel code-mode-panel" aria-labelledby="code-mode-counterfactual-title">
+        <div class="panel-head"><h2 id="code-mode-counterfactual-title"><span data-icon="compare"></span>Code Mode 成本影响（情景估算）</h2><div class="actions"><span id="execution-scope" class="badge"></span><button class="icon-button small" data-help="code-mode-cost" data-icon="info" aria-label="Code Mode 成本情景说明"></button></div></div>
+        <p class="counterfactual-brief">局部情景估算 · 非账单 · 在给定缓存与批量假设下，估算直接调用的成本差额。</p>
+        <div class="counterfactual-controls" aria-label="Code Mode 成本情景主参数">
+          <label class="counterfactual-control"><span>每轮工具数 B</span><select id="counterfactual-batching" aria-label="每轮工具数 B"><option value="1">1 · 串行</option><option value="2">2 · 批量</option><option value="4">4 · 批量</option><option value="all">all · 理想独立批量</option></select></label>
+          <label class="counterfactual-control"><span>缓存假设 h</span><select id="counterfactual-cache" aria-label="缓存假设"><option value="observed">observed · 保持锚点缓存</option><option value="0">0 · 冷缓存</option><option value="1">1 · 全缓存</option></select></label>
+        </div>
+        <p id="counterfactual-error" class="counterfactual-error" role="status" aria-live="polite" hidden></p>
+        <div id="counterfactual-comparison" class="counterfactual-comparison"></div>
+        <p id="counterfactual-interpretation" class="counterfactual-interpretation"></p>
+        <div id="counterfactual-coverage" class="counterfactual-coverage"></div>
+        <details id="counterfactual-assumptions" class="counterfactual-assumptions"><summary>估算口径、完整度与敏感性</summary>
+          <p class="counterfactual-intro">固定当前筛选的历史窗口：把每个合格的 Code Mode assistant 响应作为锚点，局部替换其内部 exec 为直接工具调用，并固定后续已有历史与工作结果。仅用于评估 Code Mode 成本影响和预估差额；不是关闭 Code Mode 重跑，也不是全会话实测节省。</p>
+          <details id="counterfactual-advanced" class="counterfactual-advanced"><summary>高级参数 q / r / g / d</summary><div class="counterfactual-advanced-grid">
+            <label class="counterfactual-control"><span>q · 每个新增直接轮次输出 <b class="param-unit">原始 Token 输入</b></span><input id="counterfactual-extra-output" type="number" min="0" max="1000000" step="1" value="0" inputmode="numeric" aria-describedby="counterfactual-default-caption"><small data-token-note="counterfactual-extra-output">参数单位例外 · 等值 —</small></label>
+            <label class="counterfactual-control"><span>r · 输出重发比例</span><input id="counterfactual-output-replay-share" type="number" min="0" max="1" step="0.01" value="0" inputmode="decimal" aria-describedby="counterfactual-default-caption"><small>只控制 U / q 进入后续输入；不免除输出费用</small></label>
+            <label class="counterfactual-control"><span>g · 新增边界工具上下文 <b class="param-unit">原始 Token 输入</b></span><input id="counterfactual-tool-context" type="number" min="0" max="1000000" step="1" value="0" inputmode="numeric" aria-describedby="counterfactual-default-caption"><small data-token-note="counterfactual-tool-context">参数单位例外 · 等值 —</small></label>
+            <label class="counterfactual-control"><span>d · Code Mode 净输出开销 <b class="param-unit">原始 Token 输入</b></span><input id="counterfactual-code-overhead" type="number" min="0" max="1000000" step="1" value="0" inputmode="numeric" aria-describedby="counterfactual-default-caption"><small data-token-note="counterfactual-code-overhead">参数单位例外 · 等值 —</small></label>
+          </div></details>
+          <p id="counterfactual-default-caption" class="counterfactual-caption">q / g / d 按原始 Token 数编辑，旁边显示等值 M。默认未计新增工具上下文/额外思考，未扣 Code Mode 输出开销，r=0 不自动重放输出（尤其隐藏思考）为输入，不表示实测为零。r 仅是假设的可回放输出比例；r=1 也不代表实际 API 会把全部含思考输出送入下一轮。直接调用轮数按 B 情景计算，不假定每个工具都对应一次模型调用。</p>
+          <div id="counterfactual-coverage-details" class="counterfactual-coverage counterfactual-coverage-detail"></div>
+          <div id="counterfactual-sensitivity" class="counterfactual-sensitivity"></div>
+        </details>
+        <div class="counterfactual-footer"><span id="counterfactual-price-note" class="counterfactual-caption"></span><button id="counterfactual-export" class="text-button" disabled>导出情景 CSV</button></div>
       </section>
-      <section class="panel harness-panel"><div class="panel-head"><h2><span data-icon="terminal"></span>Harness</h2><span id="harness-count" class="badge"></span></div><div id="harness-ranking" class="ranking"></div><div class="panel-foot">含缓存 Token · 点击联动筛选</div></section>
-      <section class="panel ranking-panel">
-        <div class="panel-head"><h2><span data-icon="layers"></span>用量分布</h2><div class="actions"><select id="distribution-dimension" aria-label="分布维度"><option value="model">模型</option><option value="project">项目</option><option value="hostname">终端</option><option value="source">Harness</option><option value="requestType">请求类型</option></select><select id="distribution-metric" aria-label="分布指标"><option value="allTokens">Token</option><option value="inputTokens">输入</option><option value="cachedInputTokens">缓存读</option><option value="outputTokens">输出</option><option value="reasoningOutputTokens">推理</option><option value="knownCost">已知金额</option></select></div></div>
-        <div id="distributions" class="ranking"></div><div class="panel-foot"><span id="ranking-note"></span><button id="show-all" class="text-button" aria-expanded="false">全部</button></div>
-      </section>
-      <section class="panel daily-panel"><div class="panel-head"><h2><span data-icon="range"></span>典型一天</h2><button class="icon-button small" data-view="percentiles" data-icon="expand" aria-label="展开每日分位分析" title="展开每日分位分析"></button></div><div class="daily-hero"><div><span class="eyebrow">P50 · TOKEN / 日</span><strong id="daily-median" class="number">—</strong></div><span id="daily-sample" class="badge"></span></div><div id="daily-histogram"></div><div id="daily-range"></div><div id="daily-stats" class="six-stats"></div><div class="panel-foot">仅描述样本 · 不预测未来</div></section>
+      <details id="execution-diagnostics" class="execution-diagnostics">
+        <summary><span>估算依据与执行诊断</span><span class="muted">原生 Pi 证据 · 默认折叠</span></summary>
+        <div class="execution-diagnostics-body">
+          <div class="execution-diagnostics-tools"><span class="muted">保留原执行 CSV，供进一步核对</span><button id="execution-export" class="text-button" disabled>导出执行 CSV</button><button class="icon-button small" data-help="execution" data-icon="info" aria-label="执行效率口径"></button></div>
+          <div class="execution-notice notice">仅统计有执行证据的原生 Pi assistant 响应。其他 Harness、旧导入或缺少 execution 数据显示为无证据，不当作 0；这些响应数也不等于完整 HTTP/API 请求数或计费次数。</div>
+          <div id="execution-empty" class="empty" hidden>当前筛选没有原生 Pi assistant 响应记录。其他来源、旧导入或缺少 execution 数据不代表 0。</div>
+          <div id="execution-data">
+            <section id="execution-metrics" class="execution-metrics" aria-label="执行效率指标">
+              <div class="execution-metric"><span class="eyebrow">批处理覆盖</span><strong id="execution-batch-value" class="number">—</strong><span id="execution-batch-note" class="metric-note"></span></div>
+              <div class="execution-metric"><span class="eyebrow">中位工具数</span><strong id="execution-median-value" class="number">—</strong><span id="execution-median-note" class="metric-note"></span></div>
+              <div class="execution-metric"><span class="eyebrow">均值工具数</span><strong id="execution-mean-value" class="number">—</strong><span id="execution-mean-note" class="metric-note"></span></div>
+              <div class="execution-metric"><span class="eyebrow">已记录 assistant 响应</span><strong id="execution-response-value" class="number">—</strong><span class="metric-note">不等于完整 HTTP/API 请求或计费次数</span></div>
+              <div class="execution-metric"><span class="eyebrow">平均输入（M）</span><strong id="execution-input-value" class="number">—</strong><span id="execution-input-note" class="metric-note"></span></div>
+              <div class="execution-metric"><span class="eyebrow">精确 exec 样本覆盖</span><strong id="execution-exact-value" class="number">—</strong><span id="execution-exact-note" class="metric-note"></span></div>
+            </section>
+            <div class="execution-layout">
+              <section class="panel execution-histogram-panel"><div class="panel-head"><h2><span data-icon="layers"></span>精确 exec 分布</h2><span id="execution-histogram-sample" class="badge"></span></div><div id="execution-histogram" aria-label="每个精确 exec 单元的内部工具数分布"></div><div id="execution-histogram-note" class="panel-foot"></div></section>
+              <section class="panel execution-mode-panel"><div class="panel-head"><h2><span data-icon="terminal"></span>响应证据模式</h2><span class="muted">不是实验分组</span></div><div id="execution-modes" class="table-wrap" tabindex="0" aria-label="按响应证据模式的执行统计"></div><div class="panel-foot">Code Mode / other tools / no tools / unknown 是观测证据，不是配置开关。</div></section>
+              <section class="panel execution-trend-panel"><div class="panel-head"><h2><span data-icon="trend"></span>每日执行趋势</h2><div class="actions"><span id="execution-trend-sample" class="badge"></span><select id="execution-trend-metric" aria-label="执行趋势指标"><option value="meanTools">均值工具数</option><option value="medianTools">中位工具数</option><option value="p75Tools">P75 工具数</option><option value="responseCount">已记录响应</option><option value="exactCoverage">精确样本覆盖</option></select><button class="icon-button small" data-help="execution-trend" data-icon="info" aria-label="执行趋势说明"></button></div></div><div id="execution-trend"></div><div class="chart-footer"><div id="execution-trend-legend" class="legend"></div><span class="muted">点击日期下钻</span></div></section>
+              <section class="panel execution-evidence-panel"><div class="panel-head"><h2><span data-icon="compare"></span>完整度与错误标记（观察下限）</h2><span class="muted">不推断成功率</span></div><div id="execution-evidence" class="execution-statline"></div><div class="panel-foot">pending / unknown 不按 0 计入均值、分位或分布；不完整工具、嵌套错误和 shell 非零数均是 trace 观察下限，不推断成功率或失败率。</div></section>
+            </div>
+            <div class="execution-table-grid">
+              <section class="panel execution-table-panel"><div class="panel-head"><h2><span data-icon="model"></span>模型摘要</h2><span class="muted">合并直方图后计算</span></div><div id="execution-model-table" class="table-wrap" tabindex="0" aria-label="模型执行效率摘要"></div></section>
+              <section class="panel execution-table-panel"><div class="panel-head"><h2><span data-icon="folder"></span>会话摘要</h2><div class="actions"><span class="muted">仅显示哈希前缀</span><button id="execution-session-toggle" class="text-button" hidden aria-expanded="false"></button></div></div><div id="execution-session-table" class="table-wrap" tabindex="0" aria-label="会话执行效率摘要"></div></section>
+            </div>
+          </div>
+        </div>
+      </details>
     </div>
   </section>
   <section id="percentiles" class="view" aria-label="每日分布与分位" hidden>
     <div class="view-heading"><h1>日分布</h1><div class="actions"><span class="muted">Min → Max · 同一样本</span><button class="icon-button small" data-help="quantile" data-icon="info" aria-label="分位与样本口径"></button></div></div>
     <div class="sample-controls"><label class="checkbox"><input type="checkbox" id="include-zero">无记录日按 0 纳入</label><span id="sample-note"></span></div>
-    <div class="analysis-grid"><section class="panel"><div class="panel-head"><h2>Token 分位</h2><span class="muted">各行独立刻度</span></div><div id="quantile-charts"></div><details><summary>精确数值</summary><div id="quantiles" class="table-wrap" tabindex="0" aria-label="Token 分位表"></div></details></section><section class="panel"><div class="panel-head"><h2>日金额 · USD</h2><button class="icon-button small" data-help="cost" data-icon="info" aria-label="完整日金额样本与偏差"></button></div><div id="cost-sample-note" class="notice"></div><div id="cost-range"></div><div id="cost-stats" class="six-stats"></div><details><summary>完整金额 / 已知小计</summary><div id="cost-quantiles" class="table-wrap" tabindex="0" aria-label="日金额分位表"></div></details><details id="unpriced"><summary>未完整定价模型</summary><div id="unpriced-models" class="table-wrap" tabindex="0" aria-label="未定价模型"></div></details></section></div>
+    <div class="analysis-grid"><section class="panel token-distribution-panel"><div class="panel-head"><h2>Token 日分布（M）</h2><span class="muted">主指标摘要 · 各行独立刻度</span></div><div id="quantile-charts"></div><details id="token-quantile-details"><summary>完整六项 Token 分位（M）</summary><div id="quantiles" class="table-wrap" tabindex="0" aria-label="Token 分位表（百万 Token）"></div></details></section><section class="panel cost-distribution-panel"><div class="panel-head"><h2>日金额 · USD</h2><button class="icon-button small" data-help="cost" data-icon="info" aria-label="完整日金额样本与偏差"></button></div><div id="cost-sample-note" class="notice"></div><div id="cost-range"></div><div id="cost-stats" class="summary-stats cost-summary"></div><details><summary>完整金额 / 已知小计</summary><div id="cost-quantiles" class="table-wrap" tabindex="0" aria-label="日金额分位表"></div></details><details id="unpriced"><summary>未完整定价模型</summary><div id="unpriced-models" class="table-wrap" tabindex="0" aria-label="未定价模型"></div></details></section></div>
     <section class="panel"><div class="panel-head"><h2>每日数值</h2><span class="muted">选择日期可下钻</span></div><div id="daily-table" class="table-wrap" tabindex="0" aria-label="每日用量"></div></section>
   </section>
   <section id="simulation" class="view" aria-label="跨模型计价" hidden>
@@ -65,63 +128,17 @@
     <section class="panel simulation-panel"><div class="panel-head"><span id="simulation-note" class="muted"></span><div class="range-legend"><span>细线 Min–Max</span><span>色带 P25–P75</span><span>● P50</span><span>◇ P90</span></div></div><div id="simulations" class="table-wrap" tabindex="0" aria-label="跨模型每日金额与分位"></div></section>
   </section>
   <section id="records" class="view" aria-label="日级明细" hidden><div class="view-heading"><h1>日级明细</h1><select id="sort" aria-label="明细排序"><option value="date">日期 ↓</option><option value="cost">已知金额 ↓</option><option value="tokens">Token ↓</option></select></div><section class="panel"><div class="panel-head"><span class="muted">日期 × Harness × 模型 × 项目 × 终端 × 请求类型</span><button class="icon-button small" data-help="details" data-icon="info" aria-label="明细与 CSV 导出口径"></button></div><div id="details" class="table-wrap" tabindex="0" aria-label="日级用量明细"></div><div class="pagination"><span id="page-status"></span><button id="previous" class="icon-button" data-icon="left" aria-label="上一页"></button><button id="next" class="icon-button" data-icon="right" aria-label="下一页"></button></div></section></section>
-  <section id="execution" class="view" aria-label="执行效率" hidden>
-    <div class="view-heading"><h1>执行效率</h1><div class="actions"><span id="execution-scope" class="badge"></span><select id="execution-trend-metric" aria-label="执行趋势指标"><option value="meanTools">均值工具数</option><option value="medianTools">中位工具数</option><option value="p75Tools">P75 工具数</option><option value="responseCount">已记录响应</option><option value="exactCoverage">精确样本覆盖</option></select><button id="execution-export" class="text-button" disabled>导出执行 CSV</button><button class="icon-button small" data-help="execution" data-icon="info" aria-label="执行效率口径"></button></div></div>
-    <div class="execution-notice notice">仅统计有执行证据的原生 Pi assistant 响应。其他 Harness、旧导入或缺少 execution 数据显示为无证据，不当作 0；这些响应数也不等于完整 HTTP/API 请求数或计费次数。</div>
-    <section id="code-mode-counterfactual" class="panel code-mode-panel" aria-labelledby="code-mode-counterfactual-title">
-      <div class="panel-head"><h2 id="code-mode-counterfactual-title"><span data-icon="compare"></span>Code Mode 成本影响（情景估算）</h2><button class="icon-button small" data-help="code-mode-cost" data-icon="info" aria-label="Code Mode 成本情景说明"></button></div>
-      <p class="counterfactual-intro">固定当前筛选的历史窗口：把每个合格的 Code Mode assistant 响应作为锚点，局部替换其内部 exec 为直接工具调用，并固定后续已有历史与工作结果。仅是本地 what-if 对照，不重建完整会话成本，不声称任务质量或生产力因果。</p>
-      <div class="counterfactual-controls" aria-label="Code Mode 成本情景主参数">
-        <label class="counterfactual-control"><span>每轮工具数 B</span><select id="counterfactual-batching" aria-label="每轮工具数 B"><option value="1">1 · 串行</option><option value="2">2 · 批量</option><option value="4">4 · 批量</option><option value="all">all · 理想独立批量</option></select></label>
-        <label class="counterfactual-control"><span>缓存假设 h</span><select id="counterfactual-cache" aria-label="缓存假设"><option value="observed">observed · 保持锚点缓存</option><option value="0">0 · 冷缓存</option><option value="1">1 · 全缓存</option></select></label>
-      </div>
-      <details id="counterfactual-advanced" class="counterfactual-advanced"><summary>高级参数 q / r / g / d</summary><div class="counterfactual-advanced-grid">
-        <label class="counterfactual-control"><span>q · 每个新增直接轮次输出</span><input id="counterfactual-extra-output" type="number" min="0" max="1000000" step="1" value="0" inputmode="numeric" aria-describedby="counterfactual-default-caption"><small>含额外思考；每个新增直接轮次</small></label>
-        <label class="counterfactual-control"><span>r · 输出重发比例</span><input id="counterfactual-output-replay-share" type="number" min="0" max="1" step="0.01" value="0" inputmode="decimal" aria-describedby="counterfactual-default-caption"><small>只控制 U / q 进入后续输入；不免除输出费用</small></label>
-        <label class="counterfactual-control"><span>g · 新增边界工具上下文</span><input id="counterfactual-tool-context" type="number" min="0" max="1000000" step="1" value="0" inputmode="numeric" aria-describedby="counterfactual-default-caption"><small>补充未被 r 覆盖的可见调用/结果，避免与回放双算；不从日志推定</small></label>
-        <label class="counterfactual-control"><span>d · Code Mode 净输出开销</span><input id="counterfactual-code-overhead" type="number" min="0" max="1000000" step="1" value="0" inputmode="numeric" aria-describedby="counterfactual-default-caption"><small>每个锚点；扣除受实际输出封顶</small></label>
-      </div></details>
-      <p id="counterfactual-default-caption" class="counterfactual-caption">默认未计新增工具上下文/额外思考，未扣Code Mode输出开销，r=0 不自动重放输出（尤其隐藏思考）为输入，不表示实测为零。r 仅是假设的可回放输出比例；r=1 也不代表实际 API 会把全部含思考输出送入下一轮。直接调用轮数按 B 情景计算，不假定每个工具都对应一次模型调用。</p>
-      <p id="counterfactual-error" class="counterfactual-error" role="status" aria-live="polite" hidden></p>
-      <div id="counterfactual-coverage" class="counterfactual-coverage"></div>
-      <div id="counterfactual-comparison" class="counterfactual-comparison"></div>
-      <p id="counterfactual-interpretation" class="counterfactual-interpretation"></p>
-      <div id="counterfactual-sensitivity" class="counterfactual-sensitivity"></div>
-      <div class="counterfactual-footer"><span id="counterfactual-price-note" class="counterfactual-caption"></span><button id="counterfactual-export" class="text-button" disabled>导出情景 CSV</button></div>
-    </section>
-    <div id="execution-empty" class="empty" hidden>当前筛选没有原生 Pi assistant 响应记录。其他来源、旧导入或缺少 execution 数据不代表 0。</div>
-    <div id="execution-data">
-      <section id="execution-metrics" class="execution-metrics" aria-label="执行效率指标">
-        <div class="execution-metric"><span class="eyebrow">批处理覆盖</span><strong id="execution-batch-value" class="number">—</strong><span id="execution-batch-note" class="metric-note"></span></div>
-        <div class="execution-metric"><span class="eyebrow">中位工具数</span><strong id="execution-median-value" class="number">—</strong><span id="execution-median-note" class="metric-note"></span></div>
-        <div class="execution-metric"><span class="eyebrow">均值工具数</span><strong id="execution-mean-value" class="number">—</strong><span id="execution-mean-note" class="metric-note"></span></div>
-        <div class="execution-metric"><span class="eyebrow">已记录 assistant 响应</span><strong id="execution-response-value" class="number">—</strong><span class="metric-note">不等于完整 HTTP/API 请求或计费次数</span></div>
-        <div class="execution-metric"><span class="eyebrow">平均输入</span><strong id="execution-input-value" class="number">—</strong><span id="execution-input-note" class="metric-note"></span></div>
-        <div class="execution-metric"><span class="eyebrow">精确 exec 样本覆盖</span><strong id="execution-exact-value" class="number">—</strong><span id="execution-exact-note" class="metric-note"></span></div>
-      </section>
-      <div class="execution-layout">
-        <section class="panel execution-histogram-panel"><div class="panel-head"><h2><span data-icon="layers"></span>精确 exec 分布</h2><span id="execution-histogram-sample" class="badge"></span></div><div id="execution-histogram" aria-label="每个精确 exec 单元的内部工具数分布"></div><div id="execution-histogram-note" class="panel-foot"></div></section>
-        <section class="panel execution-mode-panel"><div class="panel-head"><h2><span data-icon="terminal"></span>响应证据模式</h2><span class="muted">不是实验分组</span></div><div id="execution-modes" class="table-wrap" tabindex="0" aria-label="按响应证据模式的执行统计"></div><div class="panel-foot">Code Mode / other tools / no tools / unknown 是观测证据，不是配置开关。</div></section>
-        <section class="panel execution-trend-panel"><div class="panel-head"><h2><span data-icon="trend"></span>每日趋势</h2><div class="actions"><span id="execution-trend-sample" class="badge"></span><button class="icon-button small" data-help="execution-trend" data-icon="info" aria-label="执行趋势说明"></button></div></div><div id="execution-trend"></div><div class="chart-footer"><div id="execution-trend-legend" class="legend"></div><span class="muted">点击日期下钻</span></div></section>
-        <section class="panel execution-evidence-panel"><div class="panel-head"><h2><span data-icon="compare"></span>完整度与错误标记（观察下限）</h2><span class="muted">不推断成功率</span></div><div id="execution-evidence" class="execution-statline"></div><div class="panel-foot">pending / unknown 不按 0 计入均值、分位或分布；不完整工具、嵌套错误和 shell 非零数均是 trace 观察下限，不推断成功率或失败率。</div></section>
-      </div>
-      <div class="execution-table-grid">
-        <section class="panel execution-table-panel"><div class="panel-head"><h2><span data-icon="model"></span>模型摘要</h2><span class="muted">合并直方图后计算</span></div><div id="execution-model-table" class="table-wrap" tabindex="0" aria-label="模型执行效率摘要"></div></section>
-        <section class="panel execution-table-panel"><div class="panel-head"><h2><span data-icon="folder"></span>会话摘要</h2><div class="actions"><span class="muted">仅显示哈希前缀</span><button id="execution-session-toggle" class="text-button" hidden aria-expanded="false"></button></div></div><div id="execution-session-table" class="table-wrap" tabindex="0" aria-label="会话执行效率摘要"></div></section>
-      </div>
-    </div>
-  </section>
   <footer><span><span data-icon="lock"></span>本地快照 · 离线可用</span><span id="footer-meta"></span></footer>
 </main>
 <dialog id="information" aria-labelledby="info-title"><div class="dialog-head"><h2 id="info-title">数据与口径</h2><button id="close-info" class="icon-button" data-icon="close" aria-label="关闭信息面板"></button></div><div class="dialog-body"><p id="help-message" class="notice" hidden></p><p id="metadata" class="meta"></p><p id="warnings" class="notice" hidden></p>
-<details open><summary>来源状态</summary><div id="source-status" class="table-wrap" tabindex="0" aria-label="来源读取状态"></div></details>
+<details open><summary>来源状态</summary><p id="collection-scope-detail" class="scope-detail"></p><div id="source-status" class="table-wrap" tabindex="0" aria-label="来源读取状态"></div></details>
 <details><summary>价格与出处</summary><div id="price-table" class="table-wrap" tabindex="0" aria-label="模型费率出处"></div></details>
-<details><summary>Token 与金额</summary><p>输入包含缓存写，缓存读取单列；输出不含已拆分的推理。allTokens = 输入 + 缓存读取 + 输出 + 推理；totalTokens 不含缓存读取。Token 不代表产出或生产力。</p><p>金额使用 models.dev 社区价格快照及本地覆盖，按美元 / 百万 Token 估算，不是实际扣款。未知费用为 null，不是免费；部分定价仅显示已知小计。可计价覆盖率按含缓存 Token 计算，不是账单覆盖率。</p><p>无法恢复缓存写入溢价、上下文阶梯、历史调价、批量折扣、媒体费用、税费或订阅抵扣。</p></details>
+<details><summary>Token 与金额</summary><p>输入包含缓存写，缓存读取单列；输出不含已拆分的推理。allTokens = 输入 + 缓存读取 + 输出 + 推理；totalTokens 不含缓存读取。页面所有 Token 数均以 M（百万）显示，原始 CSV 保留 Token 数值；Token 不代表产出或生产力。</p><p>金额使用 models.dev 社区价格快照及本地覆盖，按美元 / 百万 Token 估算，不是实际扣款。未知费用为 null，不是免费；部分定价仅显示已知小计。可计价覆盖率按含缓存 Token 计算，不是账单覆盖率。</p><p>无法恢复缓存写入溢价、上下文阶梯、历史调价、批量折扣、媒体费用、税费或订阅抵扣。</p></details>
 <details><summary>请求类型</summary><p>非工具调用请求：完整响应可确认没有工具调用。含工具调用请求：至少包含一次工具调用，文字与调用混合也归此类。其他（无法判定）：缺少响应、无法可靠关联、旧汇总或尚不支持分类的来源。</p><p>整条请求 usage 互斥归类，三类合计等于总量，不逐工具分摊，不表示工具自身用量。占比是含缓存 Token 比例，不是请求次数。Pi / Oh My Pi、Claude Code、Codex、ZCode 和 Kimi Code 已支持有证据的分类：Codex 使用单次响应边界并核对完成账本；ZCode 精确关联 message_id；Kimi 匹配 step 完成证据。不把整个 turn 或相邻工具当作一次请求。累计回退、缺边界、关联冲突、损坏记录及其他未接入来源仍归其他。旧报告需重新读取日志才能补出分类。</p></details>
-<details><summary>日期、分位与模型计价</summary><p>按报告时区归入日期；无记录可能是未使用、日志缺失或读取不全，不能自动视为零。截止日可能未结束。报告是主动查询快照，不做后台更新。</p><p>默认仅有用量日，无记录日按 0 纳入是显式假设。Min / P25 / P50 / P75 / P90 / Max 使用同一样本；分位采用线性插值，各指标不一定来自同一天，极值不是预算边界或预测。完整日金额分位排除未完整定价日期，可能产生样本偏差。</p><p>模型计价固定当前筛选的每天四类 Token，逐日按本报告用过的目标模型费率重新计价，然后计算分位，不把各类 Token 的分位乘价相加。目标费率齐备即可模拟，不要求原模型已定价。这不是实际节省、质量或速度预测。</p></details>
-<details><summary>执行效率</summary><p>执行视图仅使用原生 Pi 的 assistant 响应边界与 exec / wait 证据。已记录 assistant 响应不是完整 HTTP/API 请求数，也不是计费次数；其他 Harness 与旧导入没有 execution 证据时显示为无数据，不显示为 0。</p><p>精确 exec 直方图只纳入已完成且可核对的执行单元；pending、unknown 不按零处理。均值、中位数与 P75 仅使用精确样本；批处理覆盖 = ≥2 个内层工具的精确 exec / 精确 exec 总数；精确样本覆盖 = 精确 exec / 已记录 exec（包括 pending 和 unknown）。模式字段是观察到的 code_mode、other_tools、no_tools、unknown 证据，不自动代表配置、实验组、质量、速度或节省。</p><p>incompleteToolCalls、nestedToolErrors 和 shellNonzero 受 trace 丢弃与不完整影响，均为观察到的下限；页面不据此推断成功率或失败率。</p></details>
+<details><summary>日期、分位与模型计价</summary><p>按报告时区归入日期；无记录可能是未使用、日志缺失或读取不全，不能自动视为零。截止日可能未结束。报告是主动查询快照，不做后台更新。7D / 30D / 90D 均锚定报告截止日；报告范围不足时页面禁用该项，并提示重新生成更宽范围报告。</p><p>默认仅有用量日，无记录日按 0 纳入是显式假设。Min / P25 / P50 / P75 / P90 / Max 使用同一样本；分位采用线性插值，各指标不一定来自同一天，极值不是预算边界或预测。完整日金额分位排除未完整定价日期，可能产生样本偏差。</p><p>模型计价固定当前筛选的每天四类 Token，逐日按本报告用过的目标模型费率重新计价，然后计算分位，不把各类 Token 的分位乘价相加。目标费率齐备即可模拟，不要求原模型已定价。这不是实际节省、质量或速度预测。</p></details>
+<details><summary>执行效率</summary><p>执行诊断已折叠在看板第三段的“估算依据与执行诊断”中，仅使用原生 Pi 的 assistant 响应边界与 exec / wait 证据。已记录 assistant 响应不是完整 HTTP/API 请求数，也不是计费次数；其他 Harness 与旧导入没有 execution 证据时显示为无数据，不显示为 0。</p><p>精确 exec 直方图只纳入已完成且可核对的执行单元；pending、unknown 不按零处理。均值、中位数与 P75 仅使用精确样本；批处理覆盖 = ≥2 个内层工具的精确 exec / 精确 exec 总数；精确样本覆盖 = 精确 exec / 已记录 exec（包括 pending 和 unknown）。模式字段是观察到的 code_mode、other_tools、no_tools、unknown 证据，不自动代表配置、实验组、质量、速度或节省。</p><p>incompleteToolCalls、nestedToolErrors 和 shellNonzero 受 trace 丢弃与不完整影响，均为观察到的下限；页面不据此推断成功率或失败率。</p></details>
 <details><summary>Code Mode 成本情景</summary><p>成本情景只在当前筛选的局部历史窗口内比较同一批合格 Code Mode 响应：候选响应、合格锚点、exec 与价格覆盖分开显示。它使用现有规范化 usage 统计（DATA.execution）与报告费率（含本地覆盖、按完整模型标识匹配）；不新增读取原始会话、工具参数/结果或 credentials，也不上传。</p><p>观察样本、直接调用情景和差额（直接 − 观察）分别列出输入、输出和 Token 合计。默认缓存为 observed；冷 / 全缓存是显式假设，100% 缓存也不会把新出现的输出或工具上下文当作缓存。r 控制计费输出 U 可回放到后续输入的比例：r=0 不自动把含思考输出当输入，r=1 将全部含思考输出也重发但未必符合实际 API；r 不免除输出费用，q 仍全额计费。q / g / d 是高级情景参数，不是日志测量。未完整定价时金额为未定价，同时只显示同一有价格行子集的小计；pricedRows 为 0 时小计也不显示为 $0。</p><p>敏感性表是有条件的串行 / 批量与缓存对照，不是置信区间或上下界；每行覆盖不同的金额小计不能直接比较。未重建 cache 写 TTL 溢价、长上下文阶梯、上下文上限或压缩，部分 all / 100% cache 情景可能不可行。后续历史、等待行为、错误事件和工作结果保持固定；不把等待或省略的请求算作节省，也不作完整会话成本、任务质量或生产力的因果结论。</p></details>
-<details><summary>导出与隐私</summary><p>Token 明细与顶部下载 CSV 按日期 × Harness × 模型 × 项目 × 终端 × 请求类型聚合；同目录 details.csv / usage.json 保持原始粒度。执行视图的专用 CSV 按响应保留白名单统计、直方图与哈希，不含工具参数、结果或原始 ID。Harness 对应 source 字段，亦包括 Cursor 等来源。</p><p>保留来源级去重，不推断工时或模型级会话用量；会话时长仅保留在本地 JSON / sessions.csv，执行摘要直接按响应中的会话哈希分组。来源读取可联网，采集结果不上传；本 HTML 不发起网络请求。</p></details>
+<details><summary>导出与隐私</summary><p>Token 明细与顶部下载 CSV 按日期 × Harness × 模型 × 项目 × 终端 × 请求类型聚合；页面 Token 统一显示 M，同目录 details.csv / usage.json 保持原始粒度。执行诊断的专用 CSV 按响应保留白名单统计、直方图与哈希，不含工具参数、结果或原始 ID。Harness 对应 source 字段，亦包括 Cursor 等来源。</p><p>保留来源级去重，不推断工时或模型级会话用量；会话时长仅保留在本地 JSON / sessions.csv，执行摘要直接按响应中的会话哈希分组。来源读取可联网，采集结果不上传；本 HTML 不发起网络请求。</p></details>
 </div></dialog>
 <noscript>启用 JavaScript 查看报告，或打开同目录 details.csv 查看原始明细。</noscript>
 <script>/*SCRIPT*/</script>

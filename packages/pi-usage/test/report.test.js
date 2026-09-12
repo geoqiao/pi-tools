@@ -12,7 +12,7 @@ test('CLI local import -> HTML/JSON/CSV, refuses overwrites and validates option
   const root = await mkdtemp(join(tmpdir(), 'pi-usage-test-'));
   try {
     const input = join(root, 'input.json'), out = join(root, 'report');
-    await writeFile(input, JSON.stringify({ buckets: [{ source: 'pi-coding-agent', model: 'gpt-5.4', project: 'private-project', bucketStart: new Date().toISOString(), inputTokens: 1000000, prompt: 'NEVER_EXPORT_ME' }], sessions: [], apiKey: 'NEVER_EXPORT_ME' }));
+    await writeFile(input, JSON.stringify({ buckets: [{ source: 'pi-coding-agent', model: 'gpt-5.4', project: 'private-project', bucketStart: new Date().toISOString(), inputTokens: 1000000, prompt: 'NEVER_EXPORT_ME' }], sessions: [], apiKey: 'NEVER_EXPORT_ME', collectionScope: { kind: 'all', sources: ['NEVER_EXPORT_ME'], authToken: 'NEVER_EXPORT_ME' } }));
     const result = execFileSync(process.execPath, [cli, '--input', input, '--out', out, '--offline'], { encoding: 'utf8' });
     assert.equal(result.trim(), join(out, 'index.html'));
     for (const name of ['usage.json', 'index.html', 'details.csv', 'sessions.csv', 'execution.csv']) {
@@ -22,6 +22,7 @@ test('CLI local import -> HTML/JSON/CSV, refuses overwrites and validates option
     }
     const report = JSON.parse(await readFile(join(out, 'usage.json'), 'utf8'));
     assert.equal(report.schemaVersion, 2);
+    assert.deepEqual(report.collectionScope, { kind: 'import', sources: ['pi-coding-agent'], offline: true });
     assert.deepEqual(report.execution, [], 'Legacy imports have no execution evidence');
     assert.equal(report.buckets.length, 1);
     assert.ok(report.buckets[0].estimatedCost > 0);
@@ -52,9 +53,31 @@ test('Pi command runs CLI, keeps data out of model context and clears status', a
   const ctx = { cwd: '/tmp', ui: { notify: (...v) => uiEvents.push(v), setStatus: (...v) => uiEvents.push(v), setWidget: (...v) => uiEvents.push(v) } };
   await command.handler('30', ctx);
   assert.deepEqual(sentArgs.slice(-2), ['--days', '30']);
+  assert.ok(!sentArgs.includes('--sources'), 'Pi command must retain the all-source CLI default');
   assert.ok(uiEvents.some(v => String(v[0]).includes('/tmp/local-report/index.html')));
   assert.deepEqual(uiEvents.at(-1), ['pi-usage', undefined]);
   sentArgs = null;
   await command.handler('30; curl evil', ctx);
   assert.equal(sentArgs, null);
+});
+
+test('CLI preserves explicit all/selected source scope, including empty sources', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'pi-usage-scope-'));
+  try {
+    // Stub every parser in the child: never read the developer machine's usage.
+    const preload = join(root, 'parsers.mjs');
+    const moduleUrl = new URL('../vendor/vibe-usage/src/parsers/index.js', import.meta.url).href;
+    await writeFile(preload, `import { parsers } from ${JSON.stringify(moduleUrl)};\nfor (const key of Object.keys(parsers)) parsers[key] = async () => ({ buckets: [], sessions: [] });\n`);
+    for (const sources of [null, 'codex,claude-code,pi-coding-agent,codex']) {
+      const out = join(root, sources ? 'selected' : 'all');
+      execFileSync(process.execPath, ['--import', preload, cli, '--out', out, '--offline', ...(sources ? ['--sources', sources] : [])], { stdio: 'pipe' });
+      const report = JSON.parse(await readFile(join(out, 'usage.json'), 'utf8'));
+      assert.equal(report.collectionScope.kind, sources ? 'selected' : 'all');
+      assert.equal(report.collectionScope.offline, true);
+      assert.deepEqual(report.collectionScope.sources, report.statuses.map(row => row.source));
+      assert.equal(report.collectionScope.sources.length, sources ? 3 : 28);
+      assert.ok(report.statuses.every(row => row.state === 'empty'));
+      assert.deepEqual(report.buckets, []);
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

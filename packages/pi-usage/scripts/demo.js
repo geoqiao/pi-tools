@@ -1,11 +1,14 @@
 // Synthetic data only; never include a personal report in a package or screenshot fixture.
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { join } from 'node:path';
 import { normalizeData, shiftDate } from '../src/analytics.js';
 import { writeReport } from '../src/report.js';
 const snapshot = JSON.parse(await readFile(new URL('../data/prices.json', import.meta.url), 'utf8'));
 const buckets = [], sessions = [], execution = [];
-const from = '2026-06-08', to = '2026-09-05';
+const requestedDays = Number(process.argv[3] ?? process.env.PI_USAGE_DEMO_DAYS ?? 90);
+const demoDays = Number.isInteger(requestedDays) && requestedDays >= 1 && requestedDays <= 3660 ? requestedDays : 90;
+const to = '2026-09-05', from = shiftDate(to, 1 - demoDays);
 const modelIds = ['gpt-5.4', 'claude-sonnet-4-6', 'deepseek-v4-flash', 'unknown-preview'];
 // Exercise truncation, HTML escaping and CSV formula protection with synthetic names.
 const projectIds = ['atlas', 'paper-trail', 'pi-tools', '=lab,"<svg onload=alert(1)>", ' + 'long-project/'.repeat(24)];
@@ -20,7 +23,7 @@ const executionBase = (date, day, index, extra = {}) => ({
   outerToolCalls: 0, execCalls: 0, waitCalls: 0, execHistogram: {}, pendingExecs: 0, unknownExecs: 0,
   incompleteToolCalls: 0, outerExecErrors: 0, nestedToolErrors: 0, shellNonzero: 0, ...extra,
 });
-for (let d = 0; d < 90; d++) {
+for (let d = 0; d < demoDays; d++) {
   if (d % 11 === 0) continue;
   for (let m = 0; m < 4; m++) {
     const date = shiftDate(from, d);
@@ -60,4 +63,38 @@ for (let d = 0; d < 90; d++) {
   }
 }
 const data = normalizeData({ buckets, sessions, execution }, { timeZone: 'Asia/Shanghai', prices: snapshot.models });
-console.log(await writeReport({ schemaVersion: 2, from, to, timeZone: 'Asia/Shanghai', generatedAt: '2026-09-05T10:00:00Z', priceSnapshot: { date: snapshot.snapshotDate, source: snapshot.source, overrideCount: 0 }, prices: snapshot.models, ...data, statuses: [{ source: 'demo', state: 'ok', note: '合成演示数据，不是真实使用记录；execution 也为人工合成证据。' }] }, process.argv[2]));
+// Keep the synthetic report internally consistent with its declared inclusive date window.
+// Bucket timestamps are intentionally varied across UTC hours, so local-day conversion can
+// otherwise create a row just outside [from, to].
+const inReportWindow = row => row.date >= from && row.date <= to;
+data.buckets = data.buckets.filter(inReportWindow);
+data.sessions = data.sessions.filter(inReportWindow);
+data.execution = data.execution.filter(inReportWindow);
+const demoSources = ['codex', 'claude-code', 'pi-coding-agent'];
+const statusesFor = reportData => demoSources.map(source => ({
+  source, state: 'ok', buckets: reportData.buckets.filter(row => row.source === source).length,
+  sessions: reportData.sessions.filter(row => row.source === source).length,
+  note: '合成演示 Harness；不是真实使用记录。execution 也为人工合成证据。',
+}));
+const common = { schemaVersion: 2, timeZone: 'Asia/Shanghai', generatedAt: '2026-09-05T10:00:00Z', priceSnapshot: { date: snapshot.snapshotDate, source: snapshot.source, overrideCount: 0 }, prices: snapshot.models };
+const scope = { kind: 'selected', sources: demoSources, offline: true };
+const mainReport = { ...common, from, to, collectionScope: scope, ...data, statuses: statusesFor(data) };
+const output = process.argv[2];
+const mainPath = await writeReport(mainReport, output);
+const associatedPaths = [mainPath];
+if (output) {
+  // Keep browser acceptance fixtures beside the arbitrary demo directory. They
+  // are synthetic variants, never copies of a developer's usage report.
+  const shortFrom = shiftDate(to, 1 - 30);
+  const shortData = {
+    ...data,
+    buckets: data.buckets.filter(row => row.date >= shortFrom && row.date <= to),
+    sessions: data.sessions.filter(row => row.date >= shortFrom && row.date <= to),
+    execution: data.execution.filter(row => row.date >= shortFrom && row.date <= to),
+  };
+  const shortReport = { ...common, from: shortFrom, to, collectionScope: scope, ...shortData, statuses: statusesFor(shortData) };
+  associatedPaths.push(await writeReport(shortReport, join(output, 'short')));
+  const { collectionScope: _scope, execution: _execution, ...legacyReport } = shortReport;
+  associatedPaths.push(await writeReport(legacyReport, join(output, 'legacy')));
+}
+console.log(associatedPaths.join('\n'));
