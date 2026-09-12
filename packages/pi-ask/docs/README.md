@@ -8,11 +8,13 @@ This folder keeps only the documentation needed to understand and maintain the e
 - `contract.md` — external behavior, tool payload/result details, and UX guarantees
 - `remote-events.md` — local inter-extension event contract, bridge examples, and smoke-test steps
 - `architecture.md` — module boundaries and invariants
-- `../skills/ask-user/SKILL.md` — context-first clarification policy and behavioral evaluation cases (not model test results); enabled by default, but can be disabled via `pi config`; inspired by https://github.com/edlsh/pi-ask-user
+- `../skills/ask-user/SKILL.md` — compact decision boundary and router; enabled by default, but can be disabled via `pi config`; inspired by https://github.com/edlsh/pi-ask-user
+- `../skills/ask-user/references/interaction.md` — payload, TUI/RPC, and follow-up details
+- `../skills/ask-user/references/decision-cases.md` — behavioral evaluation cases, not model test results
 
 ## Reading order
 
-- start with `configuration.md` for config-editing rules
+- read `configuration.md` for settings or keymap changes
 - read `contract.md` for behavior
 - read `remote-events.md` for local bridge/event integration
 - read `architecture.md` for code layout

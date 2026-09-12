@@ -72,22 +72,22 @@ test("registered ask prompts require material gaps after context review (static)
 		}
 	}
 	for (const rule of [
-		"read available context: code, docs, conversation, and prior answers",
-		"Ask only if a critical requirement or outcome-changing preference remains unresolved",
-		"consequential or hard-to-reverse action exceeds existing authorization",
+		"critical requirements, outcome-changing preferences",
+		"missing authorization for consequential/hard-to-reverse actions",
+		"still unresolved by relevant context",
 		"requirements gathering, or interactive questions",
-		"Multiple options or architecture/naming/research labels alone do not justify asking",
-		"analyze clear comparison/research requests first",
-		"Do not use `ask_user` to reconfirm settled choices or authorization",
-		"Proceed with authorized reversible steps and routine implementation details",
-		"state useful assumptions",
-		"delegated autonomy does not waive safety boundaries",
-		"Cancellation, missing answers, or ambiguity are not high-risk approval",
-		"keep unauthorized high-risk actions blocked",
-		"ask only current blockers (or the requested interview topic)",
-		"bundle independent related questions",
-		"Answer elaboration notes first; re-ask only remaining blockers",
-		"Reopen settled decisions only for materially new information",
+		"resolve facts from available evidence",
+		"Do not reconfirm settled choices or authorization",
+		"or ask merely because alternatives exist",
+		"Complete clear comparisons/research directly",
+		"proceed with authorized routine work and delegated choices",
+		"stating useful assumptions",
+		"only current blockers or the requested interview topic",
+		"bundle independent questions",
+		"Answer elaborations first, preserve prior answers",
+		"reopen decisions only for materially new information",
+		"Cancellation, missing or ambiguous answers are not high-risk approval",
+		"keep that action blocked and continue independent authorized work",
 	]) {
 		assert.ok(guidelines.includes(rule), `Missing registered rule: ${rule}`);
 	}
@@ -99,33 +99,22 @@ test("registered ask prompts preserve payload and TUI/RPC constraints (static)",
 	const { tool } = registerMockTool();
 	const guidelines = tool.promptGuidelines.join("\n");
 
-	for (const text of [tool.description, guidelines]) {
-		for (const rule of [
-			"stable `id`",
-			"non-empty `prompt`",
-			"non-empty machine-readable `value`",
-			"visible `label`",
-			"every option has non-empty `preview` text",
-			"descriptions alone do not suffice",
-		]) {
-			assert.ok(text.includes(rule), `Missing payload guidance: ${rule}`);
-		}
-	}
-	assert.ok(
-		tool.description.includes(
-			"TUI supports single-select, multi-select, and preview-pane questions"
-		)
-	);
+	// Keep essential payload guidance in guidelines too: adapters may hide schemas.
 	for (const rule of [
+		"stable unique question `id`s",
+		"non-empty `prompt`s",
+		"distinct options with non-empty `value` and `label`",
 		"one decision per question",
-		"Keep labels short and options distinct; no filler",
 		"`single` for one answer",
-		"`multi` for multiple possible selections",
+		"`multi` for several",
+		"`preview` only with non-empty `preview` text on every option",
 		"recommendations are not preselected",
 		"questions are sequential with one choice or `Type something…`",
-		"typed multiple choices",
+		"multiple choices use typed input",
 		"previews flatten into option text",
-		"Do not promise same-screen forms, native checkbox cards, or a custom preview pane",
+		"Do not promise TUI-only features",
+		"same-screen forms, checkbox cards, a preview pane, notes, or a review tab",
+		"Neither advisory `required` nor `cancelled: false` proves approval",
 	]) {
 		assert.ok(guidelines.includes(rule), `Missing tool constraint: ${rule}`);
 	}
@@ -159,16 +148,56 @@ test("registered prompts and bundled skill omit blanket interview triggers (stat
 			);
 		}
 	}
-	assert.ok(skill.includes("Read available context before asking"));
 	assert.ok(
-		skill.includes("Do not reconfirm settled choices or existing authorization")
+		skill.includes("Check relevant context and existing authorization")
 	);
+	assert.ok(skill.includes("do not reconfirm settled decisions"));
 	assert.ok(
 		skill.includes(
 			"Cancellation, missing answers, or ambiguous responses are not approval for high-risk actions"
 		)
 	);
 	assert.ok(skill.includes("not a runtime authorization mechanism"));
+});
+
+test("prompt layers stay compact and route to shipped references (static)", async () => {
+	const { tool } = registerMockTool();
+	const skillUrl = new URL("../skills/ask-user/SKILL.md", import.meta.url);
+	const skill = await readFile(skillUrl, "utf-8");
+	// Character ceilings protect progressive disclosure, not model quality.
+	assert.ok(tool.description.length <= 300);
+	assert.ok(tool.promptGuidelines.join("\n").length <= 1900);
+	assert.ok(skill.length <= 2500);
+	assert.ok(!tool.description.includes("non-empty"));
+	assert.ok(!skill.includes('"Fix this typo'));
+	for (const path of [
+		"references/interaction.md",
+		"references/decision-cases.md",
+		"../../docs/contract.md",
+		"../../docs/configuration.md",
+	]) {
+		assert.ok(skill.includes(`(${path})`), `Missing route: ${path}`);
+		assert.ok((await readFile(new URL(path, skillUrl), "utf-8")).length > 0);
+	}
+	const cases = await readFile(
+		new URL("references/decision-cases.md", skillUrl),
+		"utf-8"
+	);
+	for (const scenario of [
+		"Fix this typo",
+		"implement the approved plan",
+		"Add data expiry",
+		"Prepare a migration plan",
+		"Interview me",
+		"questionnaire I can email",
+		"Compare SQLite and PostgreSQL",
+		"cancelled, skipped, or answered vaguely",
+		"target is production",
+		"elaboration note",
+	]) {
+		assert.ok(cases.includes(scenario), `Missing decision case: ${scenario}`);
+	}
+	assert.ok(cases.includes("Never execute real high-risk actions"));
 });
 
 test("ask option schema and tool guidance support grounded recommendations", () => {
@@ -186,7 +215,7 @@ test("ask option schema and tool guidance support grounded recommendations", () 
 	assert(
 		tool.promptGuidelines.some(
 			(guideline) =>
-				guideline.includes("grounded preferences") &&
+				guideline.includes("grounded `recommended: true`") &&
 				guideline.includes("description")
 		)
 	);
