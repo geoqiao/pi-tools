@@ -14,6 +14,7 @@ const rangeValues = row => [row.min, ...row.values, row.max];
 const dimensionValue = (key, value) => key === 'requestType' ? REQUEST_TYPES[value] ?? REQUEST_TYPES.other : value;
 const executionModes = { code_mode: 'Code Mode 证据', other_tools: '其他工具', no_tools: '无工具', unknown: '未知' };
 const executionCsvColumns = ['date', 'source', 'provider', 'model', 'project', 'hostname', 'requestType', 'timestamp', 'sessionHash', 'responseHash', 'mode', 'fullInputTokens', 'cacheReadTokens', 'outputTokens', 'outerToolCalls', 'execCalls', 'waitCalls', 'execHistogram', 'pendingExecs', 'unknownExecs', 'incompleteToolCalls', 'outerExecErrors', 'nestedToolErrors', 'shellNonzero'];
+const counterfactualCsvColumns = ['scenario', 'filterFrom', 'filterTo', 'filterSource', 'filterModel', 'filterProject', 'filterHostname', 'filterRequestType', 'executionRows', 'toolsPerRound', 'cache', 'outputReplayShare', 'extraOutputTokens', 'toolContextTokens', 'codeOverheadTokens', 'assumption', 'candidateRows', 'candidateExecs', 'eligibleRows', 'eligibleExecs', 'excludedMissingExec', 'excludedZeroTools', 'excludedMissingUsage', 'pricedRows', 'priceCoverage', 'priceSnapshotDate', 'priceOverrideCount', 'addedResponses', 'removedOutputTokens', 'addedInputTokens', 'addedCachedTokens', 'addedUncachedTokens', 'actualInputTokens', 'actualOutputTokens', 'actualTotalTokens', 'actualCost', 'knownActualCost', 'directInputTokens', 'directOutputTokens', 'directTotalTokens', 'directCost', 'knownDirectCost', 'deltaInputTokens', 'deltaOutputTokens', 'deltaTotalTokens', 'deltaCost', 'knownDeltaCost'];
 const icons = {
   dashboard: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
   range: '<path d="M3 12h18M3 8v8m18-8v8"/><rect x="7" y="6" width="10" height="12"/><path d="M12 6v12"/>',
@@ -38,7 +39,7 @@ const icons = {
 };
 const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${icons[name] ?? icons.info}</svg>`;
 for (const node of document.querySelectorAll('[data-icon]')) node.innerHTML = icon(node.dataset.icon);
-let pageIndex = 0, currentRows = [], currentExecutionRows = [], currentFilters, showAll = false, showAllExecutionSessions = false, currentDays = [], calendar = [], activeView = 'overview';
+let pageIndex = 0, currentRows = [], currentExecutionRows = [], currentFilters, currentCounterfactual = null, showAll = false, showAllExecutionSessions = false, currentDays = [], calendar = [], activeView = 'overview';
 for (const row of DATA.buckets) row.requestType ??= 'other';
 const executionData = Array.isArray(DATA.execution) ? DATA.execution : [];
 const usedModels = [...new Set(DATA.buckets.map(row => row.model))].sort();
@@ -51,6 +52,7 @@ const help = {
   details: '当前 CSV 与页面相同，按日期 × Harness × 模型 × 项目 × 终端 × 请求类型聚合。knownCost 是已知小计，estimatedCost 仅在完整定价时有值，coverage 按含缓存 Token 计算。同目录 details.csv / usage.json 仍是原始粒度。',
   execution: '执行视图只统计原生 Pi assistant 响应中的 exec / wait 证据。已记录响应不等于完整 HTTP/API 请求或计费次数；其他 Harness、旧导入和缺失 execution 数据没有证据，不显示为零。精确直方图排除 pending / unknown；不完整工具、嵌套错误和 shell 非零数是 trace 观察下限，不推断成功率或失败率。',
   'execution-trend': '趋势按日期合并执行响应。工具数均值、中位数和 P75 只使用已完成且可核对的精确 exec 样本；pending / unknown 不按零处理。点击日期会复用全局日期筛选。',
+  'code-mode-cost': '这是当前筛选历史窗口的局部固定历史 what-if：每个合格 code_mode 响应是一个锚点，用同一响应的完整输入、缓存读和输出估算直接调用情景。B 只控制情景中的直接模型轮次，不假定每个工具一次调用；all 是理想化独立工具批量。新增输入包含每个新增边界的完整前缀与新鲜输入，100% 缓存也不缓存新出现的输出或工具上下文。r 控制计费输出可回放到后续输入的比例：r=0 不自动把含思考输出当输入，r=1 也未必符合实际 API；r 不免除输出费用，q 仍全额计费。g 可补充未被 r 覆盖的可见调用/结果上下文，避免与回放双算。金额使用报告价格与本地覆盖的完整模型标识；pricedRows 为 0 时金额和小计均未知，不是 $0。未重建 cache 写 TTL 溢价、长上下文阶梯、上下文上限或压缩，部分 all / 100% cache 情景可能不可行。后续历史、等待、错误与工作结果保持固定，不是实测全会话节省率。',
 };
 function table(headers, rows) {
   if (!rows.length) return '<p class="empty">没有可用数据，请调整筛选。</p>';
@@ -305,9 +307,198 @@ function renderExecutionTables(rows) {
   sessionToggle.textContent = showAllExecutionSessions ? `收起（${full(sessions.length)} 个）` : `显示全部 ${full(sessions.length)} 个会话`;
   sessionToggle.setAttribute('aria-expanded', String(showAllExecutionSessions));
 }
+function counterfactualFiltersValid() {
+  const filters = getFilters();
+  return filters.from && filters.to && filters.from <= filters.to && filters.from >= DATA.from && filters.to <= DATA.to;
+}
+function readCounterfactualOptions() {
+  const batchValue = $('counterfactual-batching').value;
+  const toolsPerRound = batchValue === 'all' ? 'all' : Number(batchValue);
+  if (toolsPerRound !== 'all' && (!Number.isSafeInteger(toolsPerRound) || toolsPerRound < 1 || toolsPerRound > 1000)) return { error: '每轮工具数 B 需为 1–1000 的整数或 all。' };
+  const cacheValue = $('counterfactual-cache').value;
+  const cache = cacheValue === 'observed' ? 'observed' : Number(cacheValue);
+  if (cache !== 'observed' && (!Number.isFinite(cache) || cache < 0 || cache > 1)) return { error: '缓存假设 h 需为 observed 或 0–1 的数值。' };
+  const replayRaw = $('counterfactual-output-replay-share').value.trim();
+  const outputReplayShare = Number(replayRaw);
+  if (!replayRaw || !Number.isFinite(outputReplayShare) || outputReplayShare < 0 || outputReplayShare > 1) return { error: '输出重发比例 r 需为 0–1 的数值。' };
+  const values = {};
+  for (const [key, id, label] of [
+    ['extraOutputTokens', 'counterfactual-extra-output', 'q'],
+    ['toolContextTokens', 'counterfactual-tool-context', 'g'],
+    ['codeOverheadTokens', 'counterfactual-code-overhead', 'd'],
+  ]) {
+    const raw = $(id).value.trim();
+    const value = Number(raw);
+    if (!raw || !Number.isSafeInteger(value) || value < 0 || value > 1000000) return { error: `${label} 需为 0–1000000 的整数。` };
+    values[key] = value;
+  }
+  return { options: { toolsPerRound, cache, outputReplayShare, ...values } };
+}
+function estimateCounterfactual(rows, options) {
+  if (typeof estimateCodeModeCost !== 'function') throw new Error('报告未嵌入 Code Mode 成本分析器。');
+  return estimateCodeModeCost(rows, DATA.prices ?? {}, options);
+}
+function counterfactualBatchLabel(value) { return value === 'all' ? 'all（理想独立批量）' : `B=${value}`; }
+function counterfactualCacheLabel(value) {
+  if (value === 'observed') return 'observed（保持锚点缓存）';
+  if (value === 0) return '0（冷缓存）';
+  if (value === 1) return '1（全缓存）';
+  return `h=${full(value)}`;
+}
+function counterfactualCount(value) { return value == null ? '—' : full(value); }
+function counterfactualCoverage(used, total) {
+  if (used == null || total == null) return '—';
+  return total > 0 ? `${full(used)} / ${full(total)} · ${percent(used / total)}` : `${full(used)} / ${full(total)} · —`;
+}
+function counterfactualSigned(value, formatter = full) {
+  if (value == null) return '—';
+  if (value === 0) return formatter(0);
+  return `${value > 0 ? '+' : '-'}${formatter(Math.abs(value))}`;
+}
+function counterfactualMoney(value) {
+  if (value == null) return '—';
+  if (value !== 0 && Math.abs(value) < 0.000001) return `${value < 0 ? '-' : ''}<$0.000001`;
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 6 }).format(value);
+}
+function counterfactualSignedMoney(value) {
+  if (value == null) return '—';
+  if (value === 0) return counterfactualMoney(0);
+  if (Math.abs(value) < 0.000001) return `${value > 0 ? '+' : '-'}<$0.000001`;
+  return `${value > 0 ? '+' : '-'}${counterfactualMoney(Math.abs(value))}`;
+}
+function counterfactualTone(value) { return value == null || value === 0 ? 'counterfactual-neutral' : value > 0 ? 'counterfactual-positive' : 'counterfactual-negative'; }
+function counterfactualCostText(result, segment, knownKey) {
+  if (!(result?.eligibleRows > 0)) return '—';
+  const cost = result[segment]?.cost;
+  if (cost != null && result.pricedRows > 0) return counterfactualMoney(cost);
+  const known = result.pricedRows > 0 ? result[knownKey] : null;
+  return known == null ? '未完整定价' : `未完整定价 · 同队列已知小计 ${counterfactualMoney(known)}`;
+}
+function counterfactualDeltaCostText(result) {
+  if (!(result?.eligibleRows > 0)) return '—';
+  if (result.delta.cost != null && result.pricedRows > 0) return counterfactualSignedMoney(result.delta.cost);
+  if (result.pricedRows > 0 && result.knownDeltaCost != null) return `未完整定价 · 同队列 ${counterfactualSignedMoney(result.knownDeltaCost)}`;
+  return '未完整定价';
+}
+function setCounterfactualError(message) {
+  const node = $('counterfactual-error');
+  node.hidden = !message;
+  node.textContent = message ?? '';
+}
+function clearCounterfactualOutput() {
+  currentCounterfactual = null;
+  $('counterfactual-coverage').innerHTML = '';
+  $('counterfactual-comparison').innerHTML = '<p class="empty">暂无 Code Mode 成本情景结果。</p>';
+  $('counterfactual-interpretation').textContent = '';
+  $('counterfactual-interpretation').className = 'counterfactual-interpretation';
+  $('counterfactual-sensitivity').innerHTML = '';
+  $('counterfactual-price-note').textContent = '';
+  $('counterfactual-export').disabled = true;
+  for (const key of ['toolsPerRound', 'cache', 'outputReplayShare', 'outputReplaySupported', 'deltaTotalTokens', 'deltaCost', 'directInputTokens', 'directOutputTokens']) delete $('counterfactual-comparison').dataset[key];
+}
+function renderCounterfactualCoverage(result) {
+  const excluded = result.excluded ?? {};
+  $('counterfactual-coverage').innerHTML = `<div class="counterfactual-stat"><span>候选响应</span><strong>${esc(counterfactualCount(result.candidateRows))}</strong><small>execCalls &gt; 0 的响应</small></div><div class="counterfactual-stat"><span>合格锚点</span><strong>${esc(counterfactualCoverage(result.eligibleRows, result.candidateRows))}</strong><small>eligible / candidate · 完整 Code Mode 证据与 usage</small></div><div class="counterfactual-stat"><span>候选 exec</span><strong>${esc(counterfactualCount(result.candidateExecs))}</strong><small>候选响应内的 exec 总数</small></div><div class="counterfactual-stat"><span>合格 exec</span><strong>${esc(counterfactualCoverage(result.eligibleExecs, result.candidateExecs))}</strong><small>合格锚点内的 exec 总数</small></div><div class="counterfactual-stat"><span>价格覆盖</span><strong>${esc(counterfactualCoverage(result.pricedRows, result.eligibleRows))}</strong><small>${result.pricedRows > 0 ? '同队列金额可估小计' : 'pricedRows=0：金额未知，不是 $0'}</small></div><div class="counterfactual-stat"><span>新增直接轮次</span><strong>${esc(counterfactualCount(result.addedResponses))}</strong><small>当前 B 情景的 a 总和</small></div><div class="counterfactual-stat"><span>实际扣除 Code Mode 输出</span><strong>${esc(counterfactualCount(result.removedOutputTokens))}</strong><small>逐锚点 min(d, O) 后总计</small></div><div class="counterfactual-exclusions">排除原因：missingExec ${esc(counterfactualCount(excluded.missingExec))} · zeroTools ${esc(counterfactualCount(excluded.zeroTools))} · missingUsage ${esc(counterfactualCount(excluded.missingUsage))}。纯 JS / 零内部工具锚点不替换为直接调用。</div>`;
+}
+function renderCounterfactualComparison(result, options) {
+  const deltaValue = result.delta.cost != null ? result.delta.cost : result.delta.totalTokens;
+  const tone = counterfactualTone(deltaValue);
+  const rows = [
+    ['观察样本', full(result.actual.inputTokens), full(result.actual.outputTokens), full(result.actual.totalTokens), counterfactualCostText(result, 'actual', 'knownActualCost'), false],
+    ['直接调用情景', full(result.direct.inputTokens), full(result.direct.outputTokens), full(result.direct.totalTokens), counterfactualCostText(result, 'direct', 'knownDirectCost'), false],
+    ['差额（直接 − 观察）', counterfactualSigned(result.delta.inputTokens), counterfactualSigned(result.delta.outputTokens), counterfactualSigned(result.delta.totalTokens), counterfactualDeltaCostText(result), true],
+  ];
+  $('counterfactual-comparison').innerHTML = `<div class="counterfactual-comparison-head"><strong>观察样本 vs 直接调用情景</strong><span>输入 / 输出 / Token 合计 / USD · 差额 = 直接 − 观察</span></div><div class="table-wrap"><table><thead><tr><th scope="col">方案</th><th scope="col">输入 Token</th><th scope="col">输出 Token</th><th scope="col">Token 合计</th><th scope="col">USD</th></tr></thead><tbody>${rows.map(row => `<tr class="${row[5] ? 'counterfactual-delta-row' : ''}"><td>${esc(row[0])}</td><td class="${row[5] ? tone : ''}">${esc(row[1])}</td><td class="${row[5] ? tone : ''}">${esc(row[2])}</td><td class="${row[5] ? tone : ''}">${esc(row[3])}</td><td class="${row[5] ? tone : ''}">${esc(row[4])}</td></tr>`).join('')}</tbody></table></div>`;
+  const comparison = $('counterfactual-comparison');
+  comparison.dataset.toolsPerRound = String(options.toolsPerRound);
+  comparison.dataset.cache = String(options.cache);
+  comparison.dataset.outputReplayShare = String(options.outputReplayShare);
+  comparison.dataset.outputReplaySupported = String(Object.hasOwn(result.options ?? {}, 'outputReplayShare'));
+  comparison.dataset.deltaTotalTokens = result.delta.totalTokens == null ? '' : String(result.delta.totalTokens);
+  comparison.dataset.deltaCost = result.delta.cost == null ? '' : String(result.delta.cost);
+  comparison.dataset.directInputTokens = result.direct.inputTokens == null ? '' : String(result.direct.inputTokens);
+  comparison.dataset.directOutputTokens = result.direct.outputTokens == null ? '' : String(result.direct.outputTokens);
+}
+function renderCounterfactualInterpretation(result) {
+  const node = $('counterfactual-interpretation');
+  let message = '', tone = 'counterfactual-neutral';
+  if (!(result.eligibleRows > 0)) message = '没有合格锚点；不把缺证据、零工具或缺 usage 当作零成本。';
+  else if (result.delta.cost != null) {
+    tone = counterfactualTone(result.delta.cost);
+    if (result.delta.cost > 0) message = 'USD 差额为正：直接调用在本情景更贵，因此 Code Mode 成本较低。';
+    else if (result.delta.cost < 0) message = 'USD 差额为负：直接调用在本情景更便宜，因此 Code Mode 成本较高。';
+    else message = 'USD 差额为 0：本情景的金额对照中性。';
+  } else {
+    const subtotal = result.pricedRows > 0 ? `同队列已知小计差额 ${counterfactualSignedMoney(result.knownDeltaCost)}` : '金额未完整定价';
+    message = `${subtotal}；完整金额不据此推断。Token 合计差额 ${counterfactualSigned(result.delta.totalTokens)}。`;
+  }
+  node.className = `counterfactual-interpretation ${tone}`;
+  node.textContent = message;
+}
+function renderCounterfactualSensitivity(rows, options) {
+  if (!(rows?.length) || !options) return null;
+  const specs = [
+    { group: '批处理', label: '串行', batch: 1, cache: options.cache },
+    { group: '批处理', label: 'B=2', batch: 2, cache: options.cache },
+    { group: '批处理', label: 'B=4', batch: 4, cache: options.cache },
+    { group: '批处理', label: 'all', batch: 'all', cache: options.cache },
+    { group: '缓存', label: '冷缓存', batch: options.toolsPerRound, cache: 0 },
+    { group: '缓存', label: '全缓存', batch: options.toolsPerRound, cache: 1 },
+  ];
+  let firstError = null;
+  const cells = specs.map(spec => {
+    try {
+      const result = estimateCounterfactual(rows, { ...options, toolsPerRound: spec.batch, cache: spec.cache });
+      const tone = counterfactualTone(result.delta.cost);
+      return `<tr><td>${esc(spec.group)}</td><td>${esc(spec.label)}</td><td>${esc(counterfactualBatchLabel(spec.batch))}</td><td>${esc(counterfactualCacheLabel(spec.cache))}</td><td>${esc(counterfactualCount(result.addedResponses))}</td><td>${esc(counterfactualCoverage(result.pricedRows, result.eligibleRows))}</td><td class="counterfactual-delta-cell ${tone}">${esc(counterfactualSigned(result.delta.totalTokens))}</td><td class="counterfactual-delta-cell ${tone}">${esc(counterfactualDeltaCostText(result))}</td></tr>`;
+    } catch (error) {
+      firstError ??= error instanceof Error ? error.message : String(error);
+      return `<tr><td>${esc(spec.group)}</td><td>${esc(spec.label)}</td><td>${esc(counterfactualBatchLabel(spec.batch))}</td><td>${esc(counterfactualCacheLabel(spec.cache))}</td><td colspan="4">不可用：${esc(firstError)}</td></tr>`;
+    }
+  }).join('');
+  $('counterfactual-sensitivity').innerHTML = `<div class="counterfactual-sensitivity-head"><strong>敏感性对照</strong><span>条件比较，不是置信区间或上下界</span></div><div class="table-wrap"><table><thead><tr><th scope="col">组别</th><th scope="col">情景</th><th scope="col">B</th><th scope="col">缓存 h</th><th scope="col">新增直接轮次</th><th scope="col">价格覆盖</th><th scope="col">Token Δ</th><th scope="col">USD Δ</th></tr></thead><tbody>${cells}</tbody></table></div><p class="counterfactual-caption">每行的 pricedRows / eligibleRows 可能不同；覆盖不同的金额小计不能直接比较。</p>`;
+  return firstError;
+}
+function renderCodeModeCounterfactual(rows) {
+  clearCounterfactualOutput();
+  if (!counterfactualFiltersValid()) { setCounterfactualError('当前日期筛选无效；已禁用 Code Mode 情景导出。'); return; }
+  const parsed = readCounterfactualOptions();
+  if (parsed.error) { setCounterfactualError(parsed.error); return; }
+  let result;
+  try { result = estimateCounterfactual(rows, parsed.options); }
+  catch (error) { setCounterfactualError(error instanceof Error ? error.message : String(error)); return; }
+  renderCounterfactualCoverage(result);
+  renderCounterfactualComparison(result, parsed.options);
+  renderCounterfactualInterpretation(result);
+  const sensitivityError = renderCounterfactualSensitivity(rows, parsed.options);
+  const snapshot = DATA.priceSnapshot ?? {};
+  $('counterfactual-price-note').textContent = `基础文本费率估算，非账单/订阅实付 · 规范化 DATA.execution ${full(rows.length)} 条响应 · 价格快照 ${snapshot.date ?? '—'} · 本地覆盖 ${snapshot.overrideCount == null ? '—' : full(snapshot.overrideCount)} 项 · 当前缓存 ${counterfactualCacheLabel(parsed.options.cache)} · 输出重发 r=${parsed.options.outputReplayShare}；r 只控制输出进入后续输入，不免除输出费用，新鲜输入/输出/工具上下文不因 h=1 变为缓存命中。`;
+  if (sensitivityError) setCounterfactualError(`敏感性情景不可用：${sensitivityError}`);
+  else setCounterfactualError('');
+  currentCounterfactual = sensitivityError ? null : { options: parsed.options, result };
+  $('counterfactual-export').disabled = !result.eligibleRows || Boolean(sensitivityError);
+}
+function counterfactualExportRow() {
+  const { options, result } = currentCounterfactual;
+  const filters = currentFilters ?? getFilters();
+  const excluded = result.excluded ?? {};
+  const snapshot = DATA.priceSnapshot ?? {};
+  return {
+    scenario: 'Code Mode 局部固定历史情景', filterFrom: filters.from, filterTo: filters.to, filterSource: filters.source, filterModel: filters.model, filterProject: filters.project, filterHostname: filters.hostname, filterRequestType: filters.requestType,
+    executionRows: currentExecutionRows.length, toolsPerRound: options.toolsPerRound, cache: options.cache, outputReplayShare: options.outputReplayShare, extraOutputTokens: options.extraOutputTokens, toolContextTokens: options.toolContextTokens, codeOverheadTokens: options.codeOverheadTokens,
+    assumption: '局部窗口；固定后续原有历史、等待、错误与工作结果；差额=直接−观察；不是完整会话节省率；r 只控制输出重发，不免除输出费用；新鲜输入不因 h=1 变成缓存命中。',
+    candidateRows: result.candidateRows, candidateExecs: result.candidateExecs, eligibleRows: result.eligibleRows, eligibleExecs: result.eligibleExecs, excludedMissingExec: excluded.missingExec, excludedZeroTools: excluded.zeroTools, excludedMissingUsage: excluded.missingUsage,
+    pricedRows: result.pricedRows, priceCoverage: result.eligibleRows ? result.pricedRows / result.eligibleRows : null, priceSnapshotDate: snapshot.date, priceOverrideCount: snapshot.overrideCount,
+    addedResponses: result.addedResponses, removedOutputTokens: result.removedOutputTokens, addedInputTokens: result.addedInputTokens, addedCachedTokens: result.addedCachedTokens, addedUncachedTokens: result.addedUncachedTokens,
+    actualInputTokens: result.actual.inputTokens, actualOutputTokens: result.actual.outputTokens, actualTotalTokens: result.actual.totalTokens, actualCost: result.actual.cost, knownActualCost: result.knownActualCost,
+    directInputTokens: result.direct.inputTokens, directOutputTokens: result.direct.outputTokens, directTotalTokens: result.direct.totalTokens, directCost: result.direct.cost, knownDirectCost: result.knownDirectCost,
+    deltaInputTokens: result.delta.inputTokens, deltaOutputTokens: result.delta.outputTokens, deltaTotalTokens: result.delta.totalTokens, deltaCost: result.delta.cost, knownDeltaCost: result.knownDeltaCost,
+  };
+}
 function renderExecution(rows) {
   const summary = summarizeExecution(rows);
   currentExecutionRows = rows;
+  renderCodeModeCounterfactual(rows);
   $('execution-empty').hidden = rows.length > 0;
   $('execution-data').hidden = rows.length === 0;
   $('execution-export').disabled = rows.length === 0;
@@ -335,7 +526,8 @@ function render() {
   for (const id of ['from', 'to']) $(id).setAttribute('aria-invalid', String(!valid));
   if (!valid) {
     $('filter-status').textContent = `请选择 ${DATA.from} 至 ${DATA.to} 内有效日期；保留上次有效结果。`;
-    $('export').disabled = true; $('execution-export').disabled = true;
+    $('export').disabled = true; $('execution-export').disabled = true; $('counterfactual-export').disabled = true;
+    setCounterfactualError('当前日期筛选无效；已禁用 Code Mode 情景导出。');
     return;
   }
   $('export').disabled = false;
@@ -434,6 +626,17 @@ $('execution-export').addEventListener('click', () => {
   const rows = currentExecutionRows.map(row => ({ ...row, execHistogram: JSON.stringify(row.execHistogram) }));
   const url = URL.createObjectURL(new Blob([toCsv(rows, executionCsvColumns)], { type: 'text/csv;charset=utf-8' }));
   const anchor = document.createElement('a'); anchor.href = url; anchor.download = `pi-usage-execution-${currentFilters.from}-${currentFilters.to}.csv`;
+  document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+for (const id of ['counterfactual-batching', 'counterfactual-cache']) $(id).addEventListener('change', () => renderCodeModeCounterfactual(currentExecutionRows));
+for (const id of ['counterfactual-extra-output', 'counterfactual-output-replay-share', 'counterfactual-tool-context', 'counterfactual-code-overhead']) {
+  $(id).addEventListener('input', () => renderCodeModeCounterfactual(currentExecutionRows));
+  $(id).addEventListener('change', () => renderCodeModeCounterfactual(currentExecutionRows));
+}
+$('counterfactual-export').addEventListener('click', () => {
+  if (!currentCounterfactual || !counterfactualFiltersValid()) return;
+  const url = URL.createObjectURL(new Blob([toCsv([counterfactualExportRow()], counterfactualCsvColumns)], { type: 'text/csv;charset=utf-8' }));
+  const anchor = document.createElement('a'); anchor.href = url; anchor.download = `pi-usage-code-mode-counterfactual-${currentFilters.from}-${currentFilters.to}.csv`;
   document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 render(); switchView(location.hash.slice(1) || 'overview');
