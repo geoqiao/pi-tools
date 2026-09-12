@@ -1,5 +1,11 @@
 # @geoqiao/pi-usage
 
+## 0.3.2
+
+### Patch Changes
+
+- 7581fd0: Render hidden dashboard analyses on demand, share report contracts, consolidate responsive styles, and gate releases on reproducible synthetic browser checks without changing usage or cost formulas.
+
 ## 0.3.1
 
 ### Patch Changes
