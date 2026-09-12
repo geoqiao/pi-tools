@@ -30,6 +30,24 @@ export function shiftDate(day, amount) {
   return d.toISOString().slice(0, 10);
 }
 
+// Display only: raw exports, pricing and aggregation retain token counts.
+const millionFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 });
+export function tokenMillions(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  if (value !== 0 && Math.abs(value) < 1) return value < 0 ? '−<0.000001 M' : '<0.000001 M';
+  return `${millionFormatter.format(value / 1e6)} M`;
+}
+
+// A static report cannot fetch missing days. Never silently clamp a named range.
+export function reportDatePreset(from, to, preset) {
+  const validDate = day => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day)
+    && Number.isFinite(Date.parse(`${day}T12:00:00Z`)) && shiftDate(day, 0) === day;
+  if (!validDate(from) || !validDate(to) || from > to) throw new RangeError('Invalid report date range');
+  if (!['7', '30', '90', 'all'].includes(preset)) throw new RangeError('Unknown date preset');
+  const requestedFrom = preset === 'all' ? from : shiftDate(to, 1 - Number(preset));
+  return { from: requestedFrom, to, requestedFrom, available: requestedFrom >= from };
+}
+
 export function quantile(values, p) {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);

@@ -1,11 +1,13 @@
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const num = value => value == null ? '—' : new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 }).format(value);
 const money = value => value == null ? '未定价' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value);
 const full = value => value == null ? '—' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(value);
+const tokenText = value => tokenMillions(value);
+// Headlines and axis labels prioritize readability; titles/exports retain precision.
+const shortTokenText = (value, digits = 4) => tokenText(typeof value === 'number' && Number.isFinite(value) ? Number(value.toPrecision(digits)) : value);
 const percent = value => value == null ? '—' : `${(value * 100).toFixed(1)}%`;
-const labels = { inputTokens: '输入（含缓存写）', cachedInputTokens: '缓存读取', outputTokens: '输出', reasoningOutputTokens: '推理', totalTokens: 'Token（不含缓存）', allTokens: 'Token（含缓存）', estimatedCost: '完整日金额', knownCost: '已知金额小计' };
-const shortLabels = ['输入 / 含缓存写', '缓存读取', '输出', '推理'];
+const labels = { inputTokens: '输入（M，含缓存写）', cachedInputTokens: '缓存读取（M）', outputTokens: '输出（M）', reasoningOutputTokens: '推理（M）', totalTokens: 'Token（M，不含缓存）', allTokens: 'Token（M，含缓存）', estimatedCost: '完整日金额', knownCost: '已知金额小计' };
+const shortLabels = ['输入（M）/含缓存写', '缓存读取（M）', '输出（M）', '推理（M）'];
 const dimensions = { source: 'Harness', model: '模型', project: '项目', hostname: '终端', requestType: '请求类型' };
 const colors = ['#3978ca', '#85aace', '#188c88', '#8972bc'];
 const typeColors = ['#3978ca', '#188c88', '#b4bfce'];
@@ -39,13 +41,48 @@ const icons = {
 };
 const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${icons[name] ?? icons.info}</svg>`;
 for (const node of document.querySelectorAll('[data-icon]')) node.innerHTML = icon(node.dataset.icon);
-let pageIndex = 0, currentRows = [], currentExecutionRows = [], currentFilters, currentCounterfactual = null, showAll = false, showAllExecutionSessions = false, currentDays = [], calendar = [], activeView = 'overview';
+let pageIndex = 0, currentRows = [], currentExecutionRows = [], currentFilters, currentCounterfactual = null, showAll = false, showAllExecutionSessions = false, currentDays = [], calendar = [], activeView = 'overview', activePreset = 'all';
 for (const row of DATA.buckets) row.requestType ??= 'other';
 const executionData = Array.isArray(DATA.execution) ? DATA.execution : [];
 const usedModels = [...new Set(DATA.buckets.map(row => row.model))].sort();
+const statusRows = Array.isArray(DATA.statuses) ? DATA.statuses : [];
+const recordedSources = [...new Set([...DATA.buckets, ...executionData].map(row => row.source).filter(Boolean))].sort();
+const statusSources = [...new Set(statusRows.map(row => row.source).filter(Boolean))].sort();
+const inferredSources = recordedSources.length ? recordedSources : statusSources;
+function readCollectionScope() {
+  const scope = DATA.collectionScope;
+  if (!scope || !['all', 'selected', 'import'].includes(scope.kind) || !Array.isArray(scope.sources)
+    || scope.sources.some(source => typeof source !== 'string') || typeof scope.offline !== 'boolean') return null;
+  return { kind: scope.kind, sources: [...new Set(scope.sources)], offline: scope.offline };
+}
+const collectionScope = readCollectionScope();
+const syntheticDemo = statusRows.some(row => typeof row.note === 'string' && /合成|synthetic/i.test(row.note));
+function sourceList(sources) {
+  if (!sources.length) return '暂无可确认来源';
+  const shown = sources.slice(0, 6).join('、');
+  return sources.length > 6 ? `${shown} 等 ${sources.length} 个` : shown;
+}
+function collectionScopeDescription() {
+  let description;
+  if (!collectionScope) description = `采集范围未记录：历史报告没有范围元数据；仅能推断已记录/状态来源：${sourceList(inferredSources)}，不能证明全来源。`;
+  else if (collectionScope.kind === 'all') description = `采集范围：全部来源（${collectionScope.sources.length} 个尝试采集；不表示都有用量或完整）`;
+  else if (collectionScope.kind === 'selected') description = `采集范围：指定来源（${collectionScope.sources.length} 个）· ${sourceList(collectionScope.sources)}`;
+  else description = `采集范围：导入数据（来源完整性未验证）· 已记录/状态来源：${sourceList(collectionScope.sources)}`;
+  if (collectionScope?.offline) description += collectionScope.sources.includes('cursor')
+    ? ' · 离线：Cursor 受限/不可用，仅读取本地数据'
+    : ' · 离线：仅读取本地数据';
+  if (syntheticDemo) description += ' · 合成演示（不是真实使用记录）';
+  return description;
+}
+const collectionScopeDescriptionText = collectionScopeDescription();
+function collectionScopeLabel() {
+  if (!collectionScope) return '采集范围未记录';
+  const label = collectionScope.kind === 'all' ? '全部来源' : collectionScope.kind === 'selected' ? '指定来源' : '导入数据';
+  return `${label} · ${collectionScope.sources.length} 个${collectionScope.offline ? ' · 离线' : ''}`;
+}
 const help = {
   trend: '每根柱表示一天，点击或按 Enter / 空格筛选。四类 Token 互斥堆叠；金额模式仅显示已知小计。灰色底标为无记录，不能断言未使用；黄色底标为未完整定价。截止日可能尚未结束。',
-  request: '占比按含缓存 Token 计算，不是请求次数。整次请求归入非工具、含工具、其他三类之一，合计等于总量，不逐工具分摊。文字与工具混合仍归含工具。已接入 Pi / OMP、Claude、Codex、ZCode、Kimi 的可靠响应证据；缺边界、累计回退或关联冲突等保留为其他，不等于非工具。',
+  request: '占比按含缓存 Token 计算，不是请求次数。含工具分类表示响应中有工具调用的整条 response usage，不是独立执行次数，也不按工具数重复计量。整条请求归入非工具、含工具、其他三类之一，合计等于总量；文字与调用混合仍归含工具。已接入 Pi / OMP、Claude、Codex、ZCode、Kimi 的可靠响应证据；缺边界、累计回退或关联冲突等保留为其他，不等于非工具。',
   quantile: 'Min / P25 / P50 / P75 / P90 / Max 使用同一样本，分位采用线性插值。默认只纳入有用量日；将无记录日按 0 纳入是计算假设。小样本仅描述已有记录，不代表稳定规律；极值不是预算或预测边界。',
   cost: '完整日金额分布排除未完整定价日期，可能造成样本偏差，不代表全部使用日。已知小计分布另列，不冒充完整日金额。可计价 Token 覆盖率不是账单覆盖率。',
   simulation: '固定当前筛选每天的输入（含缓存写）、缓存读取、输出、推理数量，分别按本报告用过的模型费率逐日计价，再求 Min / 分位 / Max。原模型未定价不影响目标模型计价；目标费率不足或无样本不显示 0。假设 Token 数不随模型变化，不是实际节省或质量预测。',
@@ -71,13 +108,38 @@ function openInfo(topic) {
 }
 function switchView(view) {
   if (!['overview', 'percentiles', 'simulation', 'records', 'execution'].includes(view)) return;
-  activeView = view;
-  for (const node of document.querySelectorAll('.view')) node.hidden = node.id !== view;
-  for (const button of document.querySelectorAll('.views [data-view]')) button.setAttribute('aria-pressed', String(button.dataset.view === view));
+  const legacyExecution = view === 'execution';
+  activeView = legacyExecution ? 'overview' : view;
+  for (const node of document.querySelectorAll('.view')) node.hidden = node.id !== activeView;
+  for (const button of document.querySelectorAll('.views [data-view]')) button.setAttribute('aria-pressed', String(button.dataset.view === activeView));
   // Replace rather than push: exploration does not flood the browser's back stack.
-  history.replaceState(null, '', `#${view}`);
-  if (view === 'overview' && calendar.length) renderTrend(calendar);
-  if (view === 'execution' && currentExecutionRows.length) renderExecutionTrend(currentExecutionRows);
+  history.replaceState(null, '', `#${activeView}`);
+  if (activeView === 'overview' && calendar.length) renderTrend(calendar);
+  if (legacyExecution) requestAnimationFrame(() => $('code-mode-counterfactual')?.scrollIntoView({ block: 'start' }));
+}
+function updatePresetControls(filters) {
+  const unavailable = [];
+  for (const button of document.querySelectorAll('[data-days]')) {
+    let result = null;
+    try { result = reportDatePreset(DATA.from, DATA.to, button.dataset.days); } catch { /* invalid report metadata is handled as unavailable */ }
+    const available = Boolean(result?.available);
+    button.disabled = !available;
+    button.setAttribute('aria-disabled', String(!available));
+    if (!available) {
+      button.setAttribute('aria-pressed', 'false');
+      unavailable.push(`${button.textContent}：报告仅覆盖 ${DATA.from} — ${DATA.to}，需重新生成更宽范围报告`);
+      button.setAttribute('aria-label', `${button.textContent}，不可用：需重新生成更宽范围报告`);
+      button.title = `不可用：需要 ${result?.requestedFrom ?? '更早日期'} — ${DATA.to}；请重新生成更宽范围报告`;
+    } else {
+      const active = activePreset === button.dataset.days && filters.from === result.from && filters.to === result.to;
+      button.setAttribute('aria-pressed', String(active));
+      button.setAttribute('aria-label', `${button.textContent}，${result.from} 至 ${result.to}${active ? '，当前' : ''}`);
+      button.title = `${result.from} — ${result.to}（截至报告截止日 ${DATA.to}）`;
+    }
+    button.toggleAttribute('data-available', available);
+  }
+  $('preset-note').textContent = unavailable.join('；');
+  $('preset-note').hidden = unavailable.length === 0;
 }
 $('from').value = DATA.from; $('to').value = DATA.to;
 for (const key of ['from', 'to']) { $(key).min = DATA.from; $(key).max = DATA.to; }
@@ -87,16 +149,19 @@ for (const key of DIMENSIONS) {
   for (const value of values) $(key).add(new Option(dimensionValue(key, value), value));
 }
 const generated = new Date(DATA.generatedAt).toLocaleString('zh-CN', { timeZone: DATA.timeZone });
-$('metadata').textContent = `${DATA.from} — ${DATA.to} · ${DATA.timeZone} · 数据快照 ${generated} · 价格快照 ${DATA.priceSnapshot.date} · 本地覆盖 ${DATA.priceSnapshot.overrideCount} 项`;
+$('collection-scope').textContent = collectionScopeLabel();
+$('collection-scope').title = collectionScopeDescriptionText;
+$('metadata').textContent = `${DATA.from} — ${DATA.to} · ${DATA.timeZone} · ${collectionScopeDescriptionText} · 数据快照 ${generated} · 价格快照 ${DATA.priceSnapshot.date} · 本地覆盖 ${DATA.priceSnapshot.overrideCount} 项`;
+$('collection-scope-detail').textContent = collectionScopeDescriptionText;
 $('footer-meta').textContent = `${DATA.timeZone} · ${generated}`;
-const incomplete = DATA.statuses.filter(s => ['partial', 'error'].includes(s.state) || s.warningCount > 0);
+const incomplete = statusRows.filter(s => ['partial', 'error'].includes(s.state) || s.warningCount > 0);
 $('snapshot-label').textContent = incomplete.length ? `${incomplete.length} 个来源需注意` : '本地快照';
 $('snapshot').classList.toggle('has-warning', incomplete.length > 0);
 if (incomplete.length) {
   $('warnings').hidden = false;
   $('warnings').textContent = `${incomplete.map(s => s.source).join('、')} 存在读取失败、未完成索引或警告。数据可能不完整；无记录不代表未使用。`;
 }
-$('source-status').innerHTML = table(['Harness', '状态', '原始记录（全历史）', '会话（全历史）', '说明'], DATA.statuses.map(s => [s.source, ({ ok: '已读取', empty: '无记录', partial: '部分数据', error: '读取失败' })[s.state] ?? s.state, s.buckets, s.sessions, s.note]));
+$('source-status').innerHTML = table(['Harness', '状态', '原始记录（全历史）', '会话（全历史）', '说明'], statusRows.map(s => [s.source, ({ ok: '已读取', empty: '无记录', partial: '部分数据', error: '读取失败' })[s.state] ?? s.state, s.buckets, s.sessions, s.note]));
 $('price-table').innerHTML = table(['模型', '输入 $/M', '缓存读 $/M', '输出 $/M', '推理 $/M', '提供方', '出处', '备注'], usedModels.map(model => {
   const r = findRate(model, DATA.prices);
   return [model, r?.input, r?.cacheRead, r?.output, r?.reasoning, r?.provider ?? '未识别', r?.reference ?? '请添加本地覆盖', r?.tiered ? '仅基础档；上下文阶梯未展开' : '基础费率'];
@@ -106,17 +171,22 @@ function renderTrend(days) {
   const field = $('trend-metric').value, cost = field === 'cost', stacked = cost || field === 'tokens';
   const keys = cost ? ['inputCost', 'cacheCost', 'outputCost', 'reasoningCost'] : field === 'tokens' ? TOKEN_FIELDS : [field];
   const total = day => cost ? day.knownCost : field === 'tokens' ? day.allTokens : day[field];
-  const width = Math.max(300, $('trend').clientWidth), height = 208, left = 54, top = 12, plotH = 165, plotW = width - left - 14;
-  const maximum = Math.max(1, ...days.map(total)), step = plotW / Math.max(1, days.length);
+  const valueText = value => cost ? money(value) : tokenText(value);
+  const maximum = Math.max(1, ...days.map(total));
+  const axisLabels = Array.from({ length: 4 }, (_, i) => cost ? money(maximum * (1 - i / 3)) : shortTokenText(maximum * (1 - i / 3), 3));
+  const width = Math.max(300, $('trend').clientWidth), height = 208, top = 12, plotH = 165;
+  // Reserve space for M labels even on mobile instead of clipping their leading digits.
+  const left = Math.max(54, ...axisLabels.map(label => label.length * 7 + 12)), plotW = width - left - 14;
+  const step = plotW / Math.max(1, days.length);
   let svg = `<svg class="chart" viewBox="0 0 ${width} ${height}" role="group" aria-label="每日${cost ? '已知估算金额' : 'Token'}，点击或键盘选择日期">`;
   for (let i = 0; i <= 3; i++) {
     const y = top + plotH * i / 3;
-    svg += `<line class="gridline" x1="${left}" x2="${width - 14}" y1="${y}" y2="${y}"/><text x="${left - 8}" y="${y + 3}" text-anchor="end">${esc(num(maximum * (1 - i / 3)))}</text>`;
+    svg += `<line class="gridline" x1="${left}" x2="${width - 14}" y1="${y}" y2="${y}"/><text class="axis-value" x="${left - 8}" y="${y + 3}" text-anchor="end">${esc(axisLabels[i])}</text>`;
   }
   const tickCount = Math.min(days.length, Math.max(2, Math.min(7, Math.floor(plotW / 70))));
   const ticks = new Set(Array.from({ length: tickCount }, (_, i) => Math.round(i * (days.length - 1) / Math.max(1, tickCount - 1))));
   days.forEach((day, i) => {
-    const title = `${day.name} · ${!day.recorded ? '无记录' : cost ? costText(day) : `${full(total(day))} Token`}\n${TOKEN_FIELDS.map(key => `${labels[key]} ${full(day[key])}`).join(' · ')}`;
+    const title = `${day.name} · ${!day.recorded ? '无记录' : cost ? costText(day) : valueText(total(day))}\n${TOKEN_FIELDS.map(key => `${labels[key]} ${tokenText(day[key])}`).join(' · ')}`;
     const x = left + i * step + 0.5, w = Math.max(0.2, step - 1);
     svg += `<g role="button" tabindex="0" data-date="${day.name}" aria-label="${esc(title)}，筛选此日"><title>${esc(title)}</title><rect class="hit" x="${x}" y="${top}" width="${w}" height="${plotH}" fill="transparent"/>`;
     let y = top + plotH;
@@ -129,15 +199,16 @@ function renderTrend(days) {
     if (ticks.has(i)) svg += `<text x="${x}" y="202" text-anchor="${i === 0 ? 'start' : i === days.length - 1 ? 'end' : 'middle'}">${day.name.slice(5)}</text>`;
   });
   $('trend').innerHTML = svg + '</svg>';
-  $('trend-legend').innerHTML = (stacked ? TOKEN_FIELDS : [field]).map(key => `<span><i style="background:${colors[TOKEN_FIELDS.indexOf(key)]}"></i>${esc(labels[key])}${cost ? '金额' : ''}</span>`).join('');
-  $('daily-table').innerHTML = `<table><thead><tr><th>日期</th><th>Token（含缓存）</th><th>已知估算金额</th><th>可计价 Token</th></tr></thead><tbody>${days.map(day => `<tr><td><button data-date="${day.name}">${day.name}</button></td><td>${day.recorded ? full(day.allTokens) : '无记录'}</td><td>${esc(day.recorded ? costText(day) : '无记录')}</td><td>${percent(day.coverage)}</td></tr>`).join('')}</tbody></table>`;
+  $('trend-legend').innerHTML = (stacked ? TOKEN_FIELDS : [field]).map(key => `<span><i style="background:${colors[TOKEN_FIELDS.indexOf(key)]}"></i>${esc(cost ? `${labels[key]}金额` : labels[key])}</span>`).join('');
+  $('daily-table').innerHTML = `<table><thead><tr><th>日期</th><th>Token（M，含缓存）</th><th>已知估算金额</th><th>可计价 Token</th></tr></thead><tbody>${days.map(day => `<tr><td><button data-date="${day.name}">${day.name}</button></td><td>${day.recorded ? tokenText(day.allTokens) : '无记录'}</td><td>${esc(day.recorded ? costText(day) : '无记录')}</td><td>${percent(day.coverage)}</td></tr>`).join('')}</tbody></table>`;
 }
 function rankMarkup(groups, key, field, limit) {
   const cost = field === 'knownCost', maximum = Math.max(1, ...groups.map(row => row[field])), total = groups.reduce((n, row) => n + row[field], 0);
   return groups.slice(0, limit).map(row => {
-    const label = dimensionValue(key, row.name), title = `${label}\n${labels[field]}：${full(row[field])}\n估算：${costText(row)} · 可计价 Token ${percent(row.coverage)}\n点击筛选`;
+    const value = cost ? costText(row) : tokenText(row[field]);
+    const label = dimensionValue(key, row.name), title = `${label}\n${labels[field]}：${value}\n估算：${costText(row)} · 可计价 Token ${percent(row.coverage)}\n点击筛选`;
     const segments = field === 'allTokens' ? TOKEN_FIELDS.map((k, i) => `<span style="width:${row[k] / maximum * 100}%;background:${colors[i]}"></span>`).join('') : `<span style="width:${row[field] / maximum * 100}%;background:${colors[TOKEN_FIELDS.indexOf(field)] ?? colors[0]}"></span>`;
-    return `<button class="rank-row" data-dimension="${key}" data-value="${esc(row.name)}" title="${esc(title)}" aria-label="筛选${dimensions[key]}：${esc(label)}；${cost ? esc(costText(row)) : `${full(row[field])} Token`}"><span class="rank-labels"><span class="rank-name">${esc(label)}</span><span class="rank-value number">${esc(cost ? costText(row) : num(row[field]))}</span><span class="rank-share number">${cost && !row.pricedTokens ? '—' : total ? percent(row[field] / total) : '—'}</span></span><span class="rank-track" aria-hidden="true">${segments}</span></button>`;
+    return `<button class="rank-row" data-dimension="${key}" data-value="${esc(row.name)}" title="${esc(title)}" aria-label="筛选${dimensions[key]}：${esc(label)}；${esc(value)}"><span class="rank-labels"><span class="rank-name">${esc(label)}</span><span class="rank-value number">${esc(value)}</span><span class="rank-share number">${cost && !row.pricedTokens ? '—' : total ? percent(row[field] / total) : '—'}</span></span><span class="rank-track" aria-hidden="true">${segments}</span></button>`;
   }).join('') || '<p class="empty">没有可用数据</p>';
 }
 function renderDistributions(rows) {
@@ -164,42 +235,48 @@ function renderRequests(rows, sum, filters) {
   }).join('');
   $('request-ring').innerHTML = `<svg viewBox="0 0 140 140" role="img" aria-label="可分类 Token ${percent(classified)}，不是请求次数"><circle cx="70" cy="70" r="55" fill="none" stroke="#edf1f6" stroke-width="12"/>${arcs}<text x="70" y="70" text-anchor="middle" class="ring-center">${percent(classified)}</text><text x="70" y="89" text-anchor="middle" class="ring-caption">可分类 Token</text></svg>`;
   const short = ['非工具调用', '含工具调用', '其他 / 未判定'];
-  $('request-summary').innerHTML = Object.entries(REQUEST_TYPES).map(([value, label], i) => `<button data-request-type="${value}" aria-pressed="${filters.requestType === value}" aria-label="${label}，${full(values[i])} Token，点击切换筛选" title="${label} · ${full(values[i])} Token"><span class="request-label"><i style="background:${typeColors[i]}"></i>${short[i]}</span><strong>${sum.allTokens ? percent(values[i] / sum.allTokens) : '—'}</strong><span class="request-track" aria-hidden="true"><span style="width:${sum.allTokens ? values[i] / sum.allTokens * 100 : 0}%;background:${typeColors[i]}"></span></span></button>`).join('');
-  $('classification-note').textContent = '含缓存 Token 占比 · 非请求次数';
+  $('request-summary').innerHTML = Object.entries(REQUEST_TYPES).map(([value, label], i) => `<button data-request-type="${value}" aria-pressed="${filters.requestType === value}" aria-label="${label}，${tokenText(values[i])}，点击切换筛选" title="${label} · ${tokenText(values[i])}"><span class="request-label"><i style="background:${typeColors[i]}"></i>${short[i]}</span><strong>${sum.allTokens ? percent(values[i] / sum.allTokens) : '—'}</strong><span class="request-track" aria-hidden="true"><span style="width:${sum.allTokens ? values[i] / sum.allTokens * 100 : 0}%;background:${typeColors[i]}"></span></span></button>`).join('');
+  $('classification-note').textContent = '含缓存 Token（M）占比 · 响应分类，不是执行次数';
 }
-function rangeChart(row, maximum = row.max, formatter = num) {
+function rangeChart(row, maximum = row.max, formatter = tokenText) {
   if (row.min == null) return '<div class="range-empty">无可用样本</div>';
   const scale = value => 10 + value / Math.max(maximum, 1e-9) * 280;
   const [min, p25, p50, p75, p90, max] = rangeValues(row).map(scale);
   const title = rangeValues(row).map((v, i) => `${rangeLabels[i]} ${formatter(v)}`).join(' · ');
   return `<svg class="range-chart" viewBox="0 0 300 36" preserveAspectRatio="none" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title><path class="range-line" d="M${min} 18H${max}M${min} 13v10M${max} 13v10"/><rect class="range-box" x="${p25}" y="11" width="${Math.max(.5, p75 - p25)}" height="14" rx="2"/><circle class="range-median" cx="${p50}" cy="18" r=".1"/><path class="range-p90" d="m${p90} 14 4 4-4 4-4-4Z"/></svg>`;
 }
-function sixStats(row, formatter = num) {
-  return rangeValues(row).map((value, i) => `<div title="${rangeLabels[i]}：${full(value)}"><span>${rangeLabels[i]}</span><strong class="${i === 2 ? 'median' : ''}">${esc(formatter(value))}</strong></div>`).join('');
+function sixStats(row, formatter = tokenText) {
+  return rangeValues(row).map((value, i) => `<div title="${rangeLabels[i]}：${esc(formatter(value))}"><span>${rangeLabels[i]}</span><strong class="${i === 2 ? 'median' : ''}">${esc(formatter(value))}</strong></div>`).join('');
+}
+function summaryStats(row, formatter = tokenText, includeMedian = true) {
+  const values = includeMedian ? [row.values[1], row.values[0], row.values[2], row.values[3]] : [row.values[0], row.values[2], row.values[3]];
+  const items = includeMedian ? [['P50', values[0], '中位数'], ['P25–P75', `${formatter(values[1])} – ${formatter(values[2])}`, '中间 50%'], ['P90', values[3], '90 分位']] : [['P25–P75', `${formatter(values[0])} – ${formatter(values[1])}`, '中间 50%'], ['P90', values[2], '90 分位']];
+  return items.map(([label, value, note], index) => `<div class="summary-stat${includeMedian && index === 0 ? ' median' : ''}" title="${esc(`${label}：${typeof value === 'string' ? value : formatter(value)}`)}"><span>${label}</span><strong>${esc(typeof value === 'string' ? value : formatter(value))}</strong><small>${note}</small></div>`).join('');
 }
 function renderHistogram(days) {
   if (!days.length) { $('daily-histogram').innerHTML = '<svg class="chart" viewBox="0 0 300 68" role="img" aria-label="无样本日"><line class="gridline" x1="0" x2="300" y1="45" y2="45"/></svg>'; return; }
   const values = days.map(d => d.allTokens), max = Math.max(1, ...values), bins = Array(16).fill(0);
   for (const value of values) bins[Math.min(15, Math.floor(value / max * 16))]++;
   const peak = Math.max(1, ...bins);
-  $('daily-histogram').innerHTML = `<svg class="chart" viewBox="0 0 300 68" role="img" aria-label="每日含缓存 Token 频数分布，横轴用量，纵轴天数">${bins.map((count, i) => `<rect x="${i * 18.75 + 1}" y="${45 - count / peak * 40}" width="16" height="${count / peak * 40}" fill="#85aace"><title>${num(i / 16 * max)}–${num((i + 1) / 16 * max)} Token：${count} 天</title></rect>`).join('')}<text x="0" y="64">0</text><text x="150" y="64" text-anchor="middle">Token / 日 · 频数</text><text x="300" y="64" text-anchor="end">${num(max)}</text></svg>`;
+  $('daily-histogram').innerHTML = `<svg class="chart" viewBox="0 0 300 68" role="img" aria-label="每日含缓存 Token（M）频数分布，横轴用量，纵轴天数">${bins.map((count, i) => `<rect x="${i * 18.75 + 1}" y="${45 - count / peak * 40}" width="16" height="${count / peak * 40}" fill="#85aace"><title>${tokenText(i / 16 * max)}–${tokenText((i + 1) / 16 * max)}：${count} 天</title></rect>`).join('')}<text x="0" y="64">0</text><text x="150" y="64" text-anchor="middle">Token（M）/ 日 · 频数</text><text x="300" y="64" text-anchor="end">${tokenText(max)}</text></svg>`;
 }
 function renderPercentiles(days) {
   const quantiles = percentileRows(days), tokenRows = quantiles.filter(row => row.metric !== 'estimatedCost');
   const all = tokenRows.find(row => row.metric === 'allTokens');
-  $('daily-median').textContent = num(all.values[1]);
+  $('daily-median').textContent = shortTokenText(all.values[1]);
+  $('daily-median').title = tokenText(all.values[1]);
   $('daily-sample').textContent = `${days.length} 样本日${$('include-zero').checked ? ' · 含假设零日' : ''}`;
   $('daily-range').innerHTML = rangeChart(all);
-  $('daily-stats').innerHTML = sixStats(all);
+  $('daily-stats').innerHTML = summaryStats(all, tokenText, false);
   renderHistogram(days);
   $('sample-note').textContent = `${$('include-zero').checked ? '日历日 · 无记录假设为 0' : '仅有用量日'} · ${days.length} 个样本${days.length < 7 ? ' · 小样本' : ''}`;
-  $('quantile-charts').innerHTML = tokenRows.map(row => `<div class="quantile-row"><div class="quantile-title"><span>${labels[row.metric]}</span><span>${row.sampleDays} 天</span></div>${rangeChart(row)}<div class="six-stats">${sixStats(row)}</div></div>`).join('');
+  $('quantile-charts').innerHTML = `<div class="primary-distribution"><div class="quantile-title"><span>${labels.allTokens}</span><span>${all.sampleDays} 天 · 主指标</span></div>${rangeChart(all)}<div class="summary-stats">${summaryStats(all, tokenText)}</div><p class="distribution-note">优先查看含缓存总 Token 的 P50、P25–P75 与 P90；其他五项完整分位收在下方明细。</p></div>`;
   const headings = ['指标', '样本日', ...rangeLabels];
-  $('quantiles').innerHTML = table(headings, tokenRows.map(row => [labels[row.metric], row.sampleDays, ...rangeValues(row).map(full)]));
+  $('quantiles').innerHTML = table(headings, tokenRows.map(row => [labels[row.metric], row.sampleDays, ...rangeValues(row).map(tokenText)]));
   const complete = quantiles.find(row => row.metric === 'estimatedCost'), excluded = days.length - complete.sampleDays;
   $('cost-sample-note').textContent = `完整定价 ${complete.sampleDays} / ${days.length} 天 · 排除 ${excluded} 天。${excluded ? '排除日期可能造成样本偏差，不代表全部使用日。' : '公开费率估算，非实际账单。'}`;
   $('cost-range').innerHTML = rangeChart(complete, complete.max, money);
-  $('cost-stats').innerHTML = sixStats(complete, value => value == null ? '—' : num(value));
+  $('cost-stats').innerHTML = summaryStats(complete, value => value == null ? '—' : money(value));
   $('cost-quantiles').innerHTML = table(headings, [
     ['完整日金额（USD）', complete.sampleDays, ...rangeValues(complete).map(v => v == null ? '无完整定价样本' : money(v))],
     ['已知小计（非完整金额）', days.length, ...[0, ...QUANTILES, 1].map(p => days.some(d => d.pricedTokens > 0) ? money(quantile(days.map(d => d.knownCost), p)) : '无可计价用量')],
@@ -216,7 +293,7 @@ function renderSimulations() {
 function renderDetails() {
   const sorted = [...currentRows].sort((a, b) => $('sort').value === 'cost' ? (b.pricedTokens ? b.knownCost : -1) - (a.pricedTokens ? a.knownCost : -1) : $('sort').value === 'tokens' ? b.allTokens - a.allTokens : b.date.localeCompare(a.date));
   const pages = Math.max(1, Math.ceil(sorted.length / 50)); pageIndex = Math.min(pageIndex, pages - 1);
-  $('details').innerHTML = table(['日期', 'Harness', '模型', '项目', '终端', '请求类型', '输入（含缓存写）', '缓存读', '输出', '推理', 'Token（含缓存）', 'Token（不含缓存）', '已知估算金额', '可计价 Token'], sorted.slice(pageIndex * 50, (pageIndex + 1) * 50).map(row => [row.date, ...DIMENSIONS.map(key => dimensionValue(key, row[key])), ...TOKEN_FIELDS.map(key => full(row[key])), full(row.allTokens), full(row.totalTokens), costText(row), percent(row.coverage)]));
+  $('details').innerHTML = table(['日期', 'Harness', '模型', '项目', '终端', '请求类型', '输入（M，含缓存写）', '缓存读（M）', '输出（M）', '推理（M）', 'Token（M，含缓存）', 'Token（M，不含缓存）', '已知估算金额', '可计价 Token'], sorted.slice(pageIndex * 50, (pageIndex + 1) * 50).map(row => [row.date, ...DIMENSIONS.map(key => dimensionValue(key, row[key])), ...TOKEN_FIELDS.map(key => tokenText(row[key])), tokenText(row.allTokens), tokenText(row.totalTokens), costText(row), percent(row.coverage)]));
   $('page-status').textContent = `${pageIndex + 1} / ${pages} · ${full(sorted.length)} 条`;
   $('previous').disabled = pageIndex === 0; $('next').disabled = pageIndex >= pages - 1;
 }
@@ -224,7 +301,7 @@ function executionTable(headers, rows) {
   if (!rows.length) return '<p class="empty">没有可用的执行证据。</p>';
   return `<table class="execution-modes-table"><thead><tr>${headers.map(header => `<th scope="col">${esc(header)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 }
-function executionMetricValue(value) { return value == null ? '—' : num(value); }
+function executionMetricValue(value) { return value == null ? '—' : full(value); }
 function executionTrendValue(group, metric) {
   if (metric === 'responseCount') return group.responseCount;
   if (metric === 'exactCoverage') return group.execCalls ? group.completeExecs / group.execCalls : null;
@@ -252,7 +329,7 @@ function renderExecutionTrend(rows) {
   const values = groups.map(group => executionTrendValue(group, metric));
   const numeric = values.map(value => value ?? 0), maximum = metric === 'exactCoverage' ? 1 : Math.max(1, ...numeric);
   const width = Math.max(300, $('execution-trend').clientWidth), height = 210, left = 52, top = 12, plotH = 160, plotW = width - left - 14, step = plotW / Math.max(1, groups.length);
-  const valueText = value => metric === 'exactCoverage' ? percent(value) : num(value);
+  const valueText = value => metric === 'exactCoverage' ? percent(value) : full(value);
   let svg = `<svg class="chart" viewBox="0 0 ${width} ${height}" role="group" aria-label="执行效率每日趋势，${esc($('execution-trend-metric').selectedOptions[0].textContent)}">`;
   for (let i = 0; i <= 3; i++) {
     const y = top + plotH * i / 3, tick = maximum * (1 - i / 3);
@@ -293,7 +370,7 @@ function renderExecutionEvidence(sum) {
 }
 function renderExecutionTables(rows) {
   const models = groupExecution(rows, 'model').sort((a, b) => b.responseCount - a.responseCount || a.name.localeCompare(b.name));
-  $('execution-model-table').innerHTML = executionTable(['模型', '已记录响应', 'exec 调用', '完整样本', 'P50 工具', '均值工具', 'P75 工具', '平均输入', 'pending', 'unknown'], models.map(group => [group.name, full(group.responseCount), full(group.execCalls), full(group.completeExecs), executionMetricValue(group.medianTools), executionMetricValue(group.meanTools), executionMetricValue(group.p75Tools), executionMetricValue(group.averageInputTokens), full(group.pendingExecs), full(group.unknownExecs)]));
+  $('execution-model-table').innerHTML = executionTable(['模型', '已记录响应', 'exec 调用', '完整样本', 'P50 工具', '均值工具', 'P75 工具', '平均输入（M）', 'pending', 'unknown'], models.map(group => [group.name, full(group.responseCount), full(group.execCalls), full(group.completeExecs), executionMetricValue(group.medianTools), executionMetricValue(group.meanTools), executionMetricValue(group.p75Tools), tokenText(group.averageInputTokens), full(group.pendingExecs), full(group.unknownExecs)]));
   const sessions = groupExecution(rows, 'sessionHash').sort((a, b) => b.responseCount - a.responseCount || a.name.localeCompare(b.name));
   const sessionModels = new Map();
   for (const row of rows) {
@@ -301,7 +378,7 @@ function renderExecutionTables(rows) {
     sessionModels.get(row.sessionHash).add(row.model);
   }
   const visibleSessions = showAllExecutionSessions ? sessions : sessions.slice(0, 20);
-  $('execution-session-table').innerHTML = executionTable(['会话', '模型', '已记录响应', 'exec 调用', '完整样本', 'P50 工具', '均值工具', '平均输入'], visibleSessions.map(group => [`会话 ${String(group.name).slice(0, 8)}`, [...(sessionModels.get(group.name) ?? [])].join('、'), full(group.responseCount), full(group.execCalls), full(group.completeExecs), executionMetricValue(group.medianTools), executionMetricValue(group.meanTools), executionMetricValue(group.averageInputTokens)]));
+  $('execution-session-table').innerHTML = executionTable(['会话', '模型', '已记录响应', 'exec 调用', '完整样本', 'P50 工具', '均值工具', '平均输入（M）'], visibleSessions.map(group => [`会话 ${String(group.name).slice(0, 8)}`, [...(sessionModels.get(group.name) ?? [])].join('、'), full(group.responseCount), full(group.execCalls), full(group.completeExecs), executionMetricValue(group.medianTools), executionMetricValue(group.meanTools), tokenText(group.averageInputTokens)]));
   const sessionToggle = $('execution-session-toggle');
   sessionToggle.hidden = sessions.length <= 20;
   sessionToggle.textContent = showAllExecutionSessions ? `收起（${full(sessions.length)} 个）` : `显示全部 ${full(sessions.length)} 个会话`;
@@ -333,6 +410,13 @@ function readCounterfactualOptions() {
     values[key] = value;
   }
   return { options: { toolsPerRound, cache, outputReplayShare, ...values } };
+}
+function updateCounterfactualTokenNotes() {
+  for (const id of ['counterfactual-extra-output', 'counterfactual-tool-context', 'counterfactual-code-overhead']) {
+    const value = Number($(id).value);
+    const note = document.querySelector(`[data-token-note="${id}"]`);
+    if (note) note.textContent = Number.isFinite(value) ? `参数单位例外 · 等值 ${tokenText(value)}` : '参数单位例外 · 等值 —';
+  }
 }
 function estimateCounterfactual(rows, options) {
   if (typeof estimateCodeModeCost !== 'function') throw new Error('报告未嵌入 Code Mode 成本分析器。');
@@ -388,6 +472,7 @@ function setCounterfactualError(message) {
 function clearCounterfactualOutput() {
   currentCounterfactual = null;
   $('counterfactual-coverage').innerHTML = '';
+  $('counterfactual-coverage-details').innerHTML = '';
   $('counterfactual-comparison').innerHTML = '<p class="empty">暂无 Code Mode 成本情景结果。</p>';
   $('counterfactual-interpretation').textContent = '';
   $('counterfactual-interpretation').className = 'counterfactual-interpretation';
@@ -398,17 +483,18 @@ function clearCounterfactualOutput() {
 }
 function renderCounterfactualCoverage(result) {
   const excluded = result.excluded ?? {};
-  $('counterfactual-coverage').innerHTML = `<div class="counterfactual-stat"><span>候选响应</span><strong>${esc(counterfactualCount(result.candidateRows))}</strong><small>execCalls &gt; 0 的响应</small></div><div class="counterfactual-stat"><span>合格锚点</span><strong>${esc(counterfactualCoverage(result.eligibleRows, result.candidateRows))}</strong><small>eligible / candidate · 完整 Code Mode 证据与 usage</small></div><div class="counterfactual-stat"><span>候选 exec</span><strong>${esc(counterfactualCount(result.candidateExecs))}</strong><small>候选响应内的 exec 总数</small></div><div class="counterfactual-stat"><span>合格 exec</span><strong>${esc(counterfactualCoverage(result.eligibleExecs, result.candidateExecs))}</strong><small>合格锚点内的 exec 总数</small></div><div class="counterfactual-stat"><span>价格覆盖</span><strong>${esc(counterfactualCoverage(result.pricedRows, result.eligibleRows))}</strong><small>${result.pricedRows > 0 ? '同队列金额可估小计' : 'pricedRows=0：金额未知，不是 $0'}</small></div><div class="counterfactual-stat"><span>新增直接轮次</span><strong>${esc(counterfactualCount(result.addedResponses))}</strong><small>当前 B 情景的 a 总和</small></div><div class="counterfactual-stat"><span>实际扣除 Code Mode 输出</span><strong>${esc(counterfactualCount(result.removedOutputTokens))}</strong><small>逐锚点 min(d, O) 后总计</small></div><div class="counterfactual-exclusions">排除原因：missingExec ${esc(counterfactualCount(excluded.missingExec))} · zeroTools ${esc(counterfactualCount(excluded.zeroTools))} · missingUsage ${esc(counterfactualCount(excluded.missingUsage))}。纯 JS / 零内部工具锚点不替换为直接调用。</div>`;
+  $('counterfactual-coverage').innerHTML = `<div class="counterfactual-stat"><span>候选响应</span><strong>${esc(counterfactualCount(result.candidateRows))}</strong><small>execCalls &gt; 0 · 仅当前筛选</small></div><div class="counterfactual-stat"><span>合格锚点</span><strong>${esc(counterfactualCoverage(result.eligibleRows, result.candidateRows))}</strong><small>完整 Code Mode 证据与 usage</small></div><div class="counterfactual-stat"><span>价格覆盖</span><strong>${esc(counterfactualCoverage(result.pricedRows, result.eligibleRows))}</strong><small>${result.pricedRows > 0 ? '同队列金额可估小计' : 'pricedRows=0：金额未知，不是 $0'}</small></div>`;
+  $('counterfactual-coverage-details').innerHTML = `<div class="counterfactual-stat"><span>候选 exec</span><strong>${esc(counterfactualCount(result.candidateExecs))}</strong><small>候选响应内的 exec 总数</small></div><div class="counterfactual-stat"><span>合格 exec</span><strong>${esc(counterfactualCoverage(result.eligibleExecs, result.candidateExecs))}</strong><small>合格锚点内的 exec 总数</small></div><div class="counterfactual-stat"><span>新增直接轮次</span><strong>${esc(counterfactualCount(result.addedResponses))}</strong><small>当前 B 情景的 a 总和</small></div><div class="counterfactual-stat"><span>实际扣除 Code Mode 输出（M）</span><strong>${esc(tokenText(result.removedOutputTokens))}</strong><small>逐锚点 min(d, O) 后总计；d 为原始 Token 参数</small></div><div class="counterfactual-exclusions">排除原因：missingExec ${esc(counterfactualCount(excluded.missingExec))} · zeroTools ${esc(counterfactualCount(excluded.zeroTools))} · missingUsage ${esc(counterfactualCount(excluded.missingUsage))}。纯 JS / 零内部工具锚点不替换为直接调用。</div>`;
 }
 function renderCounterfactualComparison(result, options) {
   const deltaValue = result.delta.cost != null ? result.delta.cost : result.delta.totalTokens;
   const tone = counterfactualTone(deltaValue);
   const rows = [
-    ['观察样本', full(result.actual.inputTokens), full(result.actual.outputTokens), full(result.actual.totalTokens), counterfactualCostText(result, 'actual', 'knownActualCost'), false],
-    ['直接调用情景', full(result.direct.inputTokens), full(result.direct.outputTokens), full(result.direct.totalTokens), counterfactualCostText(result, 'direct', 'knownDirectCost'), false],
-    ['差额（直接 − 观察）', counterfactualSigned(result.delta.inputTokens), counterfactualSigned(result.delta.outputTokens), counterfactualSigned(result.delta.totalTokens), counterfactualDeltaCostText(result), true],
+    ['观察样本', tokenText(result.actual.inputTokens), tokenText(result.actual.outputTokens), tokenText(result.actual.totalTokens), counterfactualCostText(result, 'actual', 'knownActualCost'), false],
+    ['直接调用情景', tokenText(result.direct.inputTokens), tokenText(result.direct.outputTokens), tokenText(result.direct.totalTokens), counterfactualCostText(result, 'direct', 'knownDirectCost'), false],
+    ['差额（直接 − 观察）', counterfactualSigned(result.delta.inputTokens, tokenText), counterfactualSigned(result.delta.outputTokens, tokenText), counterfactualSigned(result.delta.totalTokens, tokenText), counterfactualDeltaCostText(result), true],
   ];
-  $('counterfactual-comparison').innerHTML = `<div class="counterfactual-comparison-head"><strong>观察样本 vs 直接调用情景</strong><span>输入 / 输出 / Token 合计 / USD · 差额 = 直接 − 观察</span></div><div class="table-wrap"><table><thead><tr><th scope="col">方案</th><th scope="col">输入 Token</th><th scope="col">输出 Token</th><th scope="col">Token 合计</th><th scope="col">USD</th></tr></thead><tbody>${rows.map(row => `<tr class="${row[5] ? 'counterfactual-delta-row' : ''}"><td>${esc(row[0])}</td><td class="${row[5] ? tone : ''}">${esc(row[1])}</td><td class="${row[5] ? tone : ''}">${esc(row[2])}</td><td class="${row[5] ? tone : ''}">${esc(row[3])}</td><td class="${row[5] ? tone : ''}">${esc(row[4])}</td></tr>`).join('')}</tbody></table></div>`;
+  $('counterfactual-comparison').innerHTML = `<div class="counterfactual-comparison-head"><strong>观察样本 vs 直接调用情景</strong><span>输入（M） / 输出（M） / Token 合计（M） / USD · 差额 = 直接 − 观察</span></div><div class="table-wrap"><table><thead><tr><th scope="col">方案</th><th scope="col">输入（M）</th><th scope="col">输出（M）</th><th scope="col">Token 合计（M）</th><th scope="col">USD</th></tr></thead><tbody>${rows.map(row => `<tr class="${row[5] ? 'counterfactual-delta-row' : ''}"><td>${esc(row[0])}</td><td class="${row[5] ? tone : ''}">${esc(row[1])}</td><td class="${row[5] ? tone : ''}">${esc(row[2])}</td><td class="${row[5] ? tone : ''}">${esc(row[3])}</td><td class="${row[5] ? tone : ''}">${esc(row[4])}</td></tr>`).join('')}</tbody></table></div>`;
   const comparison = $('counterfactual-comparison');
   comparison.dataset.toolsPerRound = String(options.toolsPerRound);
   comparison.dataset.cache = String(options.cache);
@@ -430,7 +516,7 @@ function renderCounterfactualInterpretation(result) {
     else message = 'USD 差额为 0：本情景的金额对照中性。';
   } else {
     const subtotal = result.pricedRows > 0 ? `同队列已知小计差额 ${counterfactualSignedMoney(result.knownDeltaCost)}` : '金额未完整定价';
-    message = `${subtotal}；完整金额不据此推断。Token 合计差额 ${counterfactualSigned(result.delta.totalTokens)}。`;
+    message = `${subtotal}；完整金额不据此推断。Token 合计差额 ${counterfactualSigned(result.delta.totalTokens, tokenText)}。`;
   }
   node.className = `counterfactual-interpretation ${tone}`;
   node.textContent = message;
@@ -450,16 +536,17 @@ function renderCounterfactualSensitivity(rows, options) {
     try {
       const result = estimateCounterfactual(rows, { ...options, toolsPerRound: spec.batch, cache: spec.cache });
       const tone = counterfactualTone(result.delta.cost);
-      return `<tr><td>${esc(spec.group)}</td><td>${esc(spec.label)}</td><td>${esc(counterfactualBatchLabel(spec.batch))}</td><td>${esc(counterfactualCacheLabel(spec.cache))}</td><td>${esc(counterfactualCount(result.addedResponses))}</td><td>${esc(counterfactualCoverage(result.pricedRows, result.eligibleRows))}</td><td class="counterfactual-delta-cell ${tone}">${esc(counterfactualSigned(result.delta.totalTokens))}</td><td class="counterfactual-delta-cell ${tone}">${esc(counterfactualDeltaCostText(result))}</td></tr>`;
+      return `<tr><td>${esc(spec.group)}</td><td>${esc(spec.label)}</td><td>${esc(counterfactualBatchLabel(spec.batch))}</td><td>${esc(counterfactualCacheLabel(spec.cache))}</td><td>${esc(counterfactualCount(result.addedResponses))}</td><td>${esc(counterfactualCoverage(result.pricedRows, result.eligibleRows))}</td><td class="counterfactual-delta-cell ${tone}">${esc(counterfactualSigned(result.delta.totalTokens, tokenText))}</td><td class="counterfactual-delta-cell ${tone}">${esc(counterfactualDeltaCostText(result))}</td></tr>`;
     } catch (error) {
       firstError ??= error instanceof Error ? error.message : String(error);
       return `<tr><td>${esc(spec.group)}</td><td>${esc(spec.label)}</td><td>${esc(counterfactualBatchLabel(spec.batch))}</td><td>${esc(counterfactualCacheLabel(spec.cache))}</td><td colspan="4">不可用：${esc(firstError)}</td></tr>`;
     }
   }).join('');
-  $('counterfactual-sensitivity').innerHTML = `<div class="counterfactual-sensitivity-head"><strong>敏感性对照</strong><span>条件比较，不是置信区间或上下界</span></div><div class="table-wrap"><table><thead><tr><th scope="col">组别</th><th scope="col">情景</th><th scope="col">B</th><th scope="col">缓存 h</th><th scope="col">新增直接轮次</th><th scope="col">价格覆盖</th><th scope="col">Token Δ</th><th scope="col">USD Δ</th></tr></thead><tbody>${cells}</tbody></table></div><p class="counterfactual-caption">每行的 pricedRows / eligibleRows 可能不同；覆盖不同的金额小计不能直接比较。</p>`;
+  $('counterfactual-sensitivity').innerHTML = `<div class="counterfactual-sensitivity-head"><strong>敏感性对照</strong><span>条件比较，不是置信区间或上下界</span></div><div class="table-wrap"><table><thead><tr><th scope="col">组别</th><th scope="col">情景</th><th scope="col">B</th><th scope="col">缓存 h</th><th scope="col">新增直接轮次</th><th scope="col">价格覆盖</th><th scope="col">Token Δ（M）</th><th scope="col">USD Δ</th></tr></thead><tbody>${cells}</tbody></table></div><p class="counterfactual-caption">每行的 pricedRows / eligibleRows 可能不同；覆盖不同的金额小计不能直接比较。</p>`;
   return firstError;
 }
 function renderCodeModeCounterfactual(rows) {
+  updateCounterfactualTokenNotes();
   clearCounterfactualOutput();
   if (!counterfactualFiltersValid()) { setCounterfactualError('当前日期筛选无效；已禁用 Code Mode 情景导出。'); return; }
   const parsed = readCounterfactualOptions();
@@ -472,7 +559,7 @@ function renderCodeModeCounterfactual(rows) {
   renderCounterfactualInterpretation(result);
   const sensitivityError = renderCounterfactualSensitivity(rows, parsed.options);
   const snapshot = DATA.priceSnapshot ?? {};
-  $('counterfactual-price-note').textContent = `基础文本费率估算，非账单/订阅实付 · 规范化 DATA.execution ${full(rows.length)} 条响应 · 价格快照 ${snapshot.date ?? '—'} · 本地覆盖 ${snapshot.overrideCount == null ? '—' : full(snapshot.overrideCount)} 项 · 当前缓存 ${counterfactualCacheLabel(parsed.options.cache)} · 输出重发 r=${parsed.options.outputReplayShare}；r 只控制输出进入后续输入，不免除输出费用，新鲜输入/输出/工具上下文不因 h=1 变为缓存命中。`;
+  $('counterfactual-price-note').textContent = `基础文本费率 · 非账单/订阅实付 · ${full(rows.length)} 条响应 · 价格快照 ${snapshot.date ?? '—'} · 当前 h=${counterfactualCacheLabel(parsed.options.cache)} · r=${parsed.options.outputReplayShare}`;
   if (sensitivityError) setCounterfactualError(`敏感性情景不可用：${sensitivityError}`);
   else setCounterfactualError('');
   currentCounterfactual = sensitivityError ? null : { options: parsed.options, result };
@@ -514,8 +601,8 @@ function renderExecution(rows) {
   $('execution-mean-note').textContent = summary.completeExecs ? `P75 ${executionMetricValue(summary.p75Tools)} · ${full(summary.completeExecs)} 个精确样本` : '无精确样本，不按 0 计';
   $('execution-response-value').textContent = full(summary.responseCount);
   $('execution-response-value').title = '已记录 assistant 响应；不等于完整 HTTP/API 请求或计费次数';
-  $('execution-input-value').textContent = executionMetricValue(summary.averageInputTokens);
-  $('execution-input-note').textContent = summary.inputSamples ? `${full(summary.inputSamples)} / ${full(summary.responseCount)} 个响应有完整输入 · 峰值 ${executionMetricValue(summary.peakInputTokens)}` : '没有完整输入样本，不按 0 计';
+  $('execution-input-value').textContent = tokenText(summary.averageInputTokens);
+  $('execution-input-note').textContent = summary.inputSamples ? `${full(summary.inputSamples)} / ${full(summary.responseCount)} 个响应有完整输入 · 峰值 ${tokenText(summary.peakInputTokens)}` : '没有完整输入样本，不按 0 计';
   $('execution-exact-value').textContent = percent(summary.execCalls ? summary.completeExecs / summary.execCalls : null);
   $('execution-exact-note').textContent = `${full(summary.completeExecs)} 完整 · ${full(summary.pendingExecs)} pending · ${full(summary.unknownExecs)} unknown`;
   renderExecutionHistogram(summary); renderExecutionTrend(rows); renderExecutionModes(rows); renderExecutionEvidence(summary); renderExecutionTables(rows);
@@ -541,29 +628,27 @@ function render() {
   $('filter-status').textContent = `${filters.from} — ${filters.to} · ${activeDays.length} / ${calendarDays.length} 天有用量 · ${full(currentRows.length)} 条日明细`;
   $('activity-count').textContent = `${activeDays.length} / ${calendarDays.length} 天有用量`;
   $('empty-state').hidden = sum.allTokens > 0;
-  $('empty-state').textContent = selectedExecution.length ? '当前筛选没有 Token 用量记录；执行效率视图仍可查看原生 Pi assistant 响应证据。' : '当前筛选没有用量记录。调整筛选或重置即可继续。';
+  $('empty-state').textContent = selectedExecution.length ? '当前筛选没有 Token 用量记录；看板第三段的估算依据仍可展开查看原生 Pi assistant 响应证据。' : '当前筛选没有用量记录。调整筛选或重置即可继续。';
   $('breadcrumbs').innerHTML = (filters.from !== DATA.from || filters.to !== DATA.to ? `<button data-clear="dates" aria-label="移除日期筛选">${filters.from} — ${filters.to}${icon('close')}</button>` : '') + DIMENSIONS.filter(key => filters[key]).map(key => `<button data-clear="${key}" title="${esc(dimensionValue(key, filters[key]))}" aria-label="移除${dimensions[key]}筛选：${esc(dimensionValue(key, filters[key]))}"><span class="chip-name">${dimensions[key]}：${esc(dimensionValue(key, filters[key]))}</span>${icon('close')}</button>`).join('');
   if ($('breadcrumbs').childElementCount) $('breadcrumbs').insertAdjacentHTML('beforeend', '<button data-clear="all">清除全部</button>');
-  for (const button of document.querySelectorAll('[data-days]')) {
-    const from = button.dataset.days === 'all' ? DATA.from : [DATA.from, shiftDate(DATA.to, 1 - Number(button.dataset.days))].sort().at(-1);
-    button.setAttribute('aria-pressed', String(filters.from === from && filters.to === DATA.to && (button.dataset.days === 'all' || from !== DATA.from)));
-  }
-  $('total-value').textContent = num(sum.allTokens); $('total-value').title = `${full(sum.allTokens)} Token（含缓存）`;
+  updatePresetControls(filters);
+  $('total-value').textContent = shortTokenText(sum.allTokens); $('total-value').title = `${tokenText(sum.allTokens)} · Token（含缓存）`;
   $('total-value').dataset.value = String(sum.allTokens);
-  $('net-value').textContent = `${num(sum.totalTokens)} 不含缓存`; $('net-value').title = `${full(sum.totalTokens)} Token（不含缓存）`;
+  $('net-value').textContent = `${shortTokenText(sum.totalTokens)} 不含缓存`; $('net-value').title = `${tokenText(sum.totalTokens)} · Token（不含缓存）`;
   $('token-ribbon').innerHTML = TOKEN_FIELDS.map((key, i) => `<span style="width:${sum.allTokens ? sum[key] / sum.allTokens * 100 : 0}%;background:${colors[i]}"></span>`).join('');
-  $('composition').innerHTML = TOKEN_FIELDS.map((key, i) => `<div class="token-part"><span><i style="background:${colors[i]}"></i>${shortLabels[i]}</span><strong class="number" title="${full(sum[key])} Token">${num(sum[key])}</strong><small>${sum.allTokens ? percent(sum[key] / sum.allTokens) : '—'}</small></div>`).join('');
+  $('composition').innerHTML = TOKEN_FIELDS.map((key, i) => `<div class="token-part"><span><i style="background:${colors[i]}"></i>${shortLabels[i]}</span><strong class="number" title="${tokenText(sum[key])}">${shortTokenText(sum[key])}</strong><small>${sum.allTokens ? percent(sum[key] / sum.allTokens) : '—'}</small></div>`).join('');
   $('cost-label').textContent = sum.unpricedRows ? '估算已知小计 · USD' : '估算 · USD';
   $('cost-value').textContent = !sum.allTokens ? '—' : !sum.pricedTokens ? '未定价' : money(sum.knownCost);
   $('cost-value').title = `${costText(sum)}；不是实际扣款`;
   $('coverage-bar').style.width = `${(sum.coverage ?? 0) * 100}%`;
-  $('coverage-value').textContent = `${percent(sum.coverage)} Token 可计价`;
+  $('coverage-value').textContent = `${percent(sum.coverage)} Token（M）可计价`;
   const unpriced = groupRows(buckets, 'model').filter(row => row.unpricedRows);
   $('unpriced').hidden = !unpriced.length;
-  $('unpriced-models').innerHTML = table(['模型', '未定价 Token', '已知估算金额', '可计价 Token'], unpriced.map(row => [row.name, full(row.allTokens - row.pricedTokens), costText(row), percent(row.coverage)]));
+  $('unpriced-models').innerHTML = table(['模型', '未定价 Token（M）', '已知估算金额', '可计价 Token'], unpriced.map(row => [row.name, tokenText(row.allTokens - row.pricedTokens), costText(row), percent(row.coverage)]));
   renderDistributions(buckets); renderRequests(buckets, sum, filters); renderTrend(calendarDays); renderPercentiles(currentDays); renderSimulations(); renderDetails(); renderExecution(selectedExecution);
 }
-for (const id of ['from', 'to', ...DIMENSIONS, 'include-zero', 'trend-metric', 'distribution-metric', 'distribution-dimension', 'execution-trend-metric']) $(id).addEventListener('change', query);
+for (const id of ['from', 'to']) $(id).addEventListener('change', () => { activePreset = null; query(); });
+for (const id of [...DIMENSIONS, 'include-zero', 'trend-metric', 'distribution-metric', 'distribution-dimension', 'execution-trend-metric']) $(id).addEventListener('change', query);
 $('show-all').addEventListener('click', () => { showAll = !showAll; render(); });
 for (const id of ['distributions', 'harness-ranking']) $(id).addEventListener('click', event => {
   const button = event.target.closest('[data-dimension]');
@@ -573,14 +658,14 @@ $('breadcrumbs').addEventListener('click', event => {
   const button = event.target.closest('[data-clear]');
   if (!button) return;
   if (button.dataset.clear === 'all') { $('reset').click(); $('reset').focus(); return; }
-  if (button.dataset.clear === 'dates') { $('from').value = DATA.from; $('to').value = DATA.to; }
+  if (button.dataset.clear === 'dates') { $('from').value = DATA.from; $('to').value = DATA.to; activePreset = 'all'; }
   else $(button.dataset.clear).value = '';
   query(); $('reset').focus();
 });
 function selectDay(event) {
   const target = event.target.closest('[data-date]');
   if (!target || (event.type === 'keydown' && !['Enter', ' '].includes(event.key))) return;
-  event.preventDefault(); $('from').value = target.dataset.date; $('to').value = target.dataset.date;
+  event.preventDefault(); activePreset = null; $('from').value = target.dataset.date; $('to').value = target.dataset.date;
   query(); $('from').focus();
 }
 $('trend').addEventListener('click', selectDay); $('trend').addEventListener('keydown', selectDay);
@@ -594,16 +679,21 @@ $('request-summary').addEventListener('click', event => {
 });
 $('sort').addEventListener('change', () => { pageIndex = 0; renderDetails(); });
 $('simulation-sort').addEventListener('change', renderSimulations);
+$('execution-diagnostics').addEventListener('toggle', () => { if ($('execution-diagnostics').open && currentExecutionRows.length) renderExecutionTrend(currentExecutionRows); });
 $('execution-session-toggle').addEventListener('click', () => { showAllExecutionSessions = !showAllExecutionSessions; renderExecutionTables(currentExecutionRows); });
 $('previous').addEventListener('click', () => { pageIndex--; renderDetails(); });
 $('next').addEventListener('click', () => { pageIndex++; renderDetails(); });
 for (const button of document.querySelectorAll('[data-days]')) button.addEventListener('click', () => {
-  $('to').value = DATA.to;
-  $('from').value = button.dataset.days === 'all' ? DATA.from : [DATA.from, shiftDate(DATA.to, 1 - Number(button.dataset.days))].sort().at(-1);
+  if (button.disabled) return;
+  const range = reportDatePreset(DATA.from, DATA.to, button.dataset.days);
+  if (!range.available) return;
+  activePreset = button.dataset.days;
+  $('from').value = range.from; $('to').value = range.to;
   query();
 });
 $('reset').addEventListener('click', () => {
   for (const key of DIMENSIONS) $(key).value = '';
+  activePreset = 'all';
   $('from').value = DATA.from; $('to').value = DATA.to; query();
 });
 for (const button of document.querySelectorAll('[data-view]')) button.addEventListener('click', () => {
@@ -611,7 +701,7 @@ for (const button of document.querySelectorAll('[data-view]')) button.addEventLi
   document.querySelector(`.views [data-view="${activeView}"]`).focus();
 });
 window.addEventListener('hashchange', () => switchView(location.hash.slice(1)));
-window.addEventListener('resize', () => { if (activeView === 'overview') renderTrend(calendar); else if (activeView === 'execution' && currentExecutionRows.length) renderExecutionTrend(currentExecutionRows); });
+window.addEventListener('resize', () => { if (activeView === 'overview') { renderTrend(calendar); if (currentExecutionRows.length && $('execution-diagnostics').open) renderExecutionTrend(currentExecutionRows); } });
 for (const button of document.querySelectorAll('[data-help]')) button.addEventListener('click', () => openInfo(button.dataset.help));
 $('info').addEventListener('click', () => openInfo()); $('snapshot').addEventListener('click', () => openInfo());
 $('close-info').addEventListener('click', () => $('information').close());

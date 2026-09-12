@@ -15,3 +15,15 @@ test('collector isolates source failures and flags unfinished indexes without le
   assert.ok(!JSON.stringify(result).includes('private-prompt'));
   await assert.rejects(collect({ sources: ['nonexistent'], timeZone: 'UTC', prices: {} }), /未知数据源/);
 });
+
+test('native execution availability never restricts usage collection to Pi', async t => {
+  const sources = ['claude-code', 'codex', 'pi-coding-agent'];
+  for (const [index, source] of sources.entries()) {
+    t.mock.method(parsers, source, async () => ({ buckets: [{ source, model: 'synthetic', bucketStart: '2026-09-01T00:00:00Z', inputTokens: 100 * (index + 1) }], sessions: [], execution: [] }));
+  }
+  const result = await collect({ sources, timeZone: 'UTC', prices: {} });
+  assert.deepEqual(result.buckets.map(row => row.source), sources);
+  assert.equal(result.buckets.reduce((sum, row) => sum + row.allTokens, 0), 600);
+  assert.deepEqual(result.execution, []);
+  assert.ok(result.statuses.every(row => row.state === 'ok'));
+});
