@@ -22,6 +22,7 @@ test('execution normalizer is allow-listed, nullable, timezone-aware and validat
   assert.throws(() => normalizeExecutionRows([sample({ fullInputTokens: -1 })], { timeZone: 'UTC' }));
   assert.throws(() => normalizeExecutionRows([sample({ cacheReadTokens: 200 })], { timeZone: 'UTC' }));
   assert.throws(() => normalizeExecutionRows([sample({ waitCalls: 1 })], { timeZone: 'UTC' }), /外层/);
+  assert.throws(() => normalizeExecutionRows([sample({ outerExecErrors: undefined })], { timeZone: 'UTC' }), /计数/);
 });
 
 test('histograms merge before quantiles, with pending and unknown outside the exact denominator', () => {
@@ -199,4 +200,24 @@ test('copied continuations and repeated final wait records keep their original a
   assert.equal(rows.length, 2);
   assert.equal(rows[1].waitCalls, 1);
   assert.deepEqual(warnings, []);
+});
+
+test('terminal dropped counts cannot reset even when retained traces keep the same total', () => {
+  const { rows } = feed([
+    assistant('a', [call('e')]),
+    result('e', { codeMode: true, cellId: 'x', status: 'yielded', droppedTraceCount: 10, traces: [trace('t0')] }),
+    assistant('b', [call('w', 'wait', { cell_id: 'x' })]),
+    result('w', { codeMode: true, cellId: 'x', status: 'result', traces: Array.from({ length: 11 }, (_, i) => trace('t' + i)) }),
+  ]);
+  assert.deepEqual(rows[0].execHistogram, {});
+  assert.equal(rows[0].unknownExecs, 1);
+});
+
+test('the recognized runtime omits empty traces for successful zero-tool execs too', () => {
+  // Conversion 3.0.33 trace-store.attach omits traces and droppedTraceCount when
+  // both are empty; tool-result forwards only present fields, even on success.
+  const { rows } = feed([assistant('a', [call('e')]),
+    result('e', { codeMode: true, cellId: 'x', status: 'result' })]);
+  assert.deepEqual(rows[0].execHistogram, { 0: 1 });
+  assert.equal(rows[0].outerExecErrors, 0);
 });

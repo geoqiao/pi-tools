@@ -9,9 +9,9 @@ const sum = values => values.every(v => v !== null) && Number.isSafeInteger(valu
 
 export function createPiExecutionCollector(source) {
   const responses = new Map();
-  let calls = new Map(), cells = new Map(), anonymous = 0, unlinked = false;
+  let calls = new Map(), cells = new Map(), droppedByUnit = new Map(), anonymous = 0, unlinked = false;
   const scope = (session, value) => JSON.stringify([session,value]);
-  function beginFile() { calls = new Map(); cells = new Map(); }
+  function beginFile() { calls = new Map(); cells = new Map(); droppedByUnit = new Map(); }
   function observe(entry, { sessionId, project }) {
     const m = entry.message;
     if (entry.type !== 'message' || !m) return;
@@ -19,7 +19,7 @@ export function createPiExecutionCollector(source) {
     const date = new Date(rawTime);
     if (rawTime == null || !Number.isFinite(date.getTime())) return;
     if (m.role === 'assistant') {
-      const provider = m.provider || 'unknown', model = m.model || m.modelId || entry.model || 'unknown';
+      const provider = m.provider || 'unknown', model = m.model || m.modelId || entry.model || entry.modelId || 'unknown';
       const identity = id(m.responseId) ? JSON.stringify([source,provider,model,m.responseId])
         : JSON.stringify([source,sessionId,id(entry.id) ?? 'anonymous-' + (++anonymous)]);
       let r = responses.get(identity);
@@ -87,10 +87,17 @@ export function createPiExecutionCollector(source) {
     const cellKey = scope(sessionId,d.cellId);
     if (d.status === 'yielded') cells.set(cellKey,unit);
     else if (cells.get(cellKey) === unit) cells.delete(cellKey);
+    // The recognized runtime omits an empty trace array, including on success.
     const traces = d.traces === undefined ? [] : d.traces;
     const dropped = d.droppedTraceCount === undefined ? 0 : count(d.droppedTraceCount);
     const snapshot = new Set();
     let valid = Array.isArray(traces) && dropped !== null;
+    if (dropped !== null) {
+      // Compare within this file, not with a later snapshot from a copied file.
+      const previousDropped = droppedByUnit.get(unit) ?? 0;
+      if (d.status !== 'yielded' && dropped < previousDropped) unit.unknown = true;
+      droppedByUnit.set(unit,Math.max(previousDropped,dropped));
+    }
     for (const t of Array.isArray(traces) ? traces : []) {
       if (!id(t?.id) || !id(t.name) || !['running','blocked','done','error'].includes(t.status)
         || snapshot.has(t.id)) { valid = false; continue; }

@@ -86,6 +86,21 @@ test('native parser -> contract -> collection -> CLI round trip retains executio
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
+test('legacy outer modelId has identical token and execution filter attribution', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'pi-usage-model-alias-'));
+  try {
+    const entries = fixture('2026-01-01T00:00:00Z');
+    delete entries[1].message.model;
+    entries[1].modelId = 'outer-model';
+    await writeFile(join(root, 'fixture.jsonl'), entries.map(JSON.stringify).join('\n'));
+    const raw = await parsePiSessionJsonl({ source, sessionsDirs: [root] });
+    const data = normalizeData(raw, { timeZone: 'UTC', prices: {} });
+    assert.equal(data.buckets[0].model, 'outer-model');
+    assert.equal(data.execution[0].model, 'outer-model');
+    assert.equal(selectExecution(data, { from: '2026-01-01', to: '2026-01-01', model: 'outer-model' }).length, 1);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test('execution-only sources are not empty and missing usage is not synthesized as zero', async t => {
   const root = await mkdtemp(join(tmpdir(), 'pi-usage-no-usage-'));
   try {

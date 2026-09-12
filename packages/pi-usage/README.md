@@ -94,7 +94,7 @@ Codex 的 `token_usage_record` 仅用于核对完成证据，不叠加到 `token
 
 ### Code Mode 执行效率
 
-当前只解析 **原生 Pi 日志中的 Code Mode 结构化证据**，已对照 `@howaboua/pi-codex-conversion` 3.0.33 的 trace / exec / wait 格式验证。不需要新增实时埋点、修改 Code Mode 设置或调用模型；重新生成报告即可分析已有日志。其他来源、旧版汇总或缺少 trace 的 exec 显示无证据 / 未知，**不是零调用，也不是已关闭 Code Mode**。
+当前只解析 **原生 Pi 日志中的 Code Mode 结构化证据**，已对照 `@howaboua/pi-codex-conversion` 3.0.33 的 trace / exec / wait 格式验证。不需要新增实时埋点、修改 Code Mode 设置或调用模型；重新生成报告即可分析已有日志。其他来源、旧版汇总或缺少可识别 Code Mode 结构的 exec 显示无证据 / 未知，**不是零调用，也不是已关闭 Code Mode**。
 
 | 指标 | 分母与含义 |
 |---|---|
@@ -113,7 +113,7 @@ Codex 的 `token_usage_record` 仅用于核对完成证据，不叠加到 `token
 - 一个 exec 在多次 wait 后仍只算一次；wait 本身保留为外层调用，不增加 exec 分母。exec 的最终结果归原始调用响应，wait 响应有独立的模型与输入记录，跨午夜也按原始响应时间归属。
 - 内层调用按 exec 运行时记录的工具边界计数，不是 shell 命令条数；工具内部再发出的网络请求或其他模型调用不由此计量。
 - 重复 trace ID 不重复计数。终态快照的保留 trace 数加累计 `droppedTraceCount` 可恢复总调用数，不能再加上早期快照。被截断工具的名称、状态和退出码无法补回；错误计数仅是观测下界。
-- 原生结构明确记录的无工具终态才记为 0；未完成归 pending，缺结果、无法关联或损坏结构归 unknown。pending / unknown 已观察到的内层工具数另列为下界，不加入精确直方图。
+- 已识别原生结构的无工具终态才记为 0：该运行时会省略空 `traces` 与为零的 `droppedTraceCount`，包括成功的纯 JS 执行；这不同于整块 Code Mode 结构缺失。未完成归 pending，缺结果、无法关联或矛盾结构归 unknown；累计 dropped 计数在终态回退也归 unknown，不猜测补齐。pending / unknown 已观察到的内层工具数另列为下界，不加入精确直方图。
 - 外层脚本 / exec 错误、内层 trace 错误、`exec_command` 明确非零退出码分别计数。一个执行可能同时有多类错误；未观察到错误不保证成功，不生成统一失败率。
 - 完整输入字段缺失保留 `null`，不按 0 补齐；输入平均值只用有证据的样本。`outputTokens` 是原生日志含 reasoning 的输出总量，只在独立 execution 数据集中使用，不与 Token 明细重复相加。
 - 模型 / 会话汇总使用响应自身的来源与哈希，不猜测会话的模型，不从项目 / 日期拼接 Token 桶。跨文件复制的响应 ID 去重后保留首次观察的归属；匿名记录无法可靠跨文件去重。
@@ -147,7 +147,7 @@ npx @geoqiao/pi-usage --days 30 --timezone Asia/Shanghai \
 npx @geoqiao/pi-usage --input /path/to/usage.json --days 90 --offline
 ```
 
-`--input` 接受 `{ "buckets": [...], "sessions": [...], "execution": [...] }`，忽略原有费用，按当前本地价格重新计算。新导出为 `schemaVersion: 2`；旧文件缺少 `execution` 时按空数组兼容，不能凭旧桶恢复执行证据。execution 只保留白名单统计字段与哈希标识，验证计数守恒与缺失值；其他字段不会保留，也不会自动沿用外部 CSV 的疑似重复标记。来源完整性未验证，日期窗口仍以本次执行日为截止日。
+`--input` 接受 `{ "buckets": [...], "sessions": [...], "execution": [...] }`，忽略原有费用，按当前本地价格重新计算。新导出为 `schemaVersion: 2`；旧文件缺少 `execution` 时按空数组兼容，不能凭旧桶恢复执行证据。execution 只保留白名单统计字段与哈希标识，验证计数守恒与缺失值；聚合计数字段必须完整提供，不把缺字段补成零。其他字段不会保留，也不会自动沿用外部 CSV 的疑似重复标记。来源完整性未验证，日期窗口仍以本次执行日为截止日。
 
 ## 报告与导出
 
