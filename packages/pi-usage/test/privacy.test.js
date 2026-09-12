@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { Script } from 'node:vm';
 import { sourceFetch } from '../src/network.js';
 import { renderReport } from '../src/report.js';
 
@@ -34,6 +35,8 @@ test('self-contained HTML escapes hostile data and authorizes only its exact scr
   assert.ok(html.includes("connect-src 'none'"));
   assert.equal((html.match(/<script>/g) || []).length, 1);
   const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
+  assert.doesNotThrow(() => new Script(script), 'Embedded shared modules must form a valid classic script');
+  assert.equal((script.match(/function estimateCodeModeCost\(/g) || []).length, 1);
   const hash = createHash('sha256').update(script).digest('base64');
   assert.ok(html.includes(`'sha256-${hash}'`));
   assert.ok(!/<(?:script|link|img)[^>]+(?:src|href)="https?:/i.test(html));
