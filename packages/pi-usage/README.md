@@ -324,18 +324,20 @@ pnpm --filter @geoqiao/pi-usage pack:check
 这是无构建的 JavaScript 包。`typecheck` 执行语法检查和未修改上游文件的哈希验证，不是 TypeScript 类型推导。测试覆盖计价、分位、隐私、CSV / HTML 安全、CLI、Pi 命令与上游 parser 回归；部分 SQLite 测试需要系统 `sqlite3`，运行时 Node 22.15+ 可使用内置 SQLite。
 
 <details>
-<summary>合成数据前端验证与价格快照维护</summary>
+<summary>报表实现、合成数据验证与价格快照维护</summary>
 
-前端验证不读取个人日志，使用已有 `playwright-cli`，不增加运行时依赖：
+报表只计算当前可见视图及已展开的分析；成本情景缓存绑定当前响应数据与参数，筛选或假设改变后不会沿用旧结果。CSV 字段和情景参数定义位于 `src/web/`，与 Node 端共享，计价公式仍由 `src/counterfactual.js` 负责。
+
+浏览器模块由 `src/report.js` 内联为单个脚本，保留离线 CSP；这不是通用 ESM 打包器，只接受受限的无别名 named imports。新增或修改模块需通过打包回归及浏览器验收，不支持的导入形式会直接报错。
+
+前端验证与 CI 使用同一个入口，自动创建独立的临时合成报告，不读取个人日志。Playwright 仅为固定版本的开发依赖，不增加扩展运行时依赖：
 
 ```bash
-node packages/pi-usage/scripts/demo.js /tmp/pi-usage-demo
-PLAYWRIGHT_MCP_ALLOW_UNRESTRICTED_FILE_ACCESS=1 playwright-cli -s=pi-usage open file:///tmp/pi-usage-demo/index.html
-playwright-cli -s=pi-usage run-code --filename=packages/pi-usage/scripts/browser-check.js
-playwright-cli -s=pi-usage close
+pnpm --filter @geoqiao/pi-usage exec playwright install --only-shell chromium
+pnpm --filter @geoqiao/pi-usage browser:test
 ```
 
-检查桌面、平板与 390px 移动端、四个视图、看板内成本情景、组合筛选、日期快捷范围、下钻、键盘操作、信息对话框焦点、长名称、空状态、未定价、分页与原始 CSV 数值一致性，以及执行统计的覆盖率、直方图与旧数据空状态，并验证零外部请求。合成截图写入 `/tmp/pi-usage-bi-demo-*.png`。验收私有报告时，请从仓库外的临时目录运行浏览器，避免下载和快照进入工作区。
+检查桌面、平板与 390px 移动端、四个视图、看板内成本情景、组合筛选、日期快捷范围、下钻、键盘操作、信息对话框焦点、长名称、空状态、未定价、分页与原始 CSV 数值一致性，以及执行统计的覆盖率、直方图与旧数据空状态，并验证零外部请求。运行入口打印本次临时目录，保存合成截图与 `result.json`；失败以非零退出并保存当前页面截图。Linux CI 自动安装所需浏览器系统依赖。这些开发脚本与截图不进入发布包。
 
 提供输出目录时，demo 同时在其中生成 `short/`（30 天）与 `legacy/`（无 execution / 采集范围元数据）两个合成变体。浏览器验收从当前打开的 demo URL 推导它们的位置并强制验证，不依赖固定临时目录，也不跳过失败断言。
 

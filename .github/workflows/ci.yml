@@ -1,6 +1,6 @@
 name: CI
 
-# Validation pipeline for both independently published packages.
+# Validation pipeline for independently published packages.
 
 on:
   workflow_dispatch:
@@ -37,6 +37,13 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Install browser for synthetic report checks
+        run: pnpm --filter @geoqiao/pi-usage exec playwright install --with-deps --only-shell chromium
+
+      - name: Check synthetic usage reports in Chromium
+        timeout-minutes: 5
+        run: pnpm --filter @geoqiao/pi-usage browser:test
 
       - name: Package dry runs
         run: pnpm pack:check

@@ -1,9 +1,7 @@
 // Local fixed-history scenarios, not measured whole-session savings.
 import { findRate } from './analytics.js';
-
-export const DEFAULT_COUNTERFACTUAL_OPTIONS = Object.freeze({
-  toolsPerRound: 1, cache: 'observed', extraOutputTokens: 0, toolContextTokens: 0, codeOverheadTokens: 0, outputReplayShare: 0,
-});
+import { DEFAULT_COUNTERFACTUAL_OPTIONS, validateCounterfactualOptions } from './web/counterfactual-options.js';
+export { DEFAULT_COUNTERFACTUAL_OPTIONS };
 
 function cfFinite(value) {
   if (!Number.isFinite(value)) throw new Error('情景估算数值过大，超出可计算范围');
@@ -12,18 +10,6 @@ function cfFinite(value) {
 function cfTokens(value) {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error('情景 Token 数超出安全范围');
   return value;
-}
-function cfOptions(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('情景参数必须是对象');
-  const out = Object.fromEntries(Object.entries(DEFAULT_COUNTERFACTUAL_OPTIONS)
-    .map(([key,value]) => [key,Object.hasOwn(raw,key) ? raw[key] : value]));
-  if (out.toolsPerRound !== 'all' && (!Number.isInteger(out.toolsPerRound) || out.toolsPerRound < 1 || out.toolsPerRound > 1000)) throw new Error('每轮工具数需为 1–1000 的整数或 all');
-  if (out.cache !== 'observed' && (typeof out.cache !== 'number' || !Number.isFinite(out.cache) || out.cache < 0 || out.cache > 1)) throw new Error('缓存比例需为 observed 或 0–1 的数值');
-  if (typeof out.outputReplayShare !== 'number' || !Number.isFinite(out.outputReplayShare) || out.outputReplayShare < 0 || out.outputReplayShare > 1) throw new Error('输出回放比例需为 0–1 的数值');
-  for (const key of ['extraOutputTokens','toolContextTokens','codeOverheadTokens']) {
-    if (!Number.isInteger(out[key]) || out[key] < 0 || out[key] > 1000000) throw new Error('输出、上下文和开销假设需为 0–1000000 的整数');
-  }
-  return out;
 }
 function cfRate(model, prices, cachedTokens) {
   const rate = findRate(model,prices);
@@ -36,7 +22,7 @@ function cfRate(model, prices, cachedTokens) {
 }
 
 export function estimateCodeModeCost(rows, prices = {}, options = {}) {
-  const settings = cfOptions(options);
+  const settings = validateCounterfactualOptions(options);
   if (!Array.isArray(rows)) throw new Error('执行情景需要响应数组');
   const out = { options: settings, candidateRows: 0, candidateExecs: 0, eligibleRows: 0, eligibleExecs: 0,
     excluded: { missingExec: 0, zeroTools: 0, missingUsage: 0 },
