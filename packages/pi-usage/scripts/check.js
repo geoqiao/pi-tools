@@ -10,7 +10,7 @@ for (const file of await readdir(root, { recursive: true })) {
   execFileSync(process.execPath, ['--check', fileURLToPath(new URL(file, root))], { stdio: 'pipe' });
 }
 const original = JSON.parse(await readFile(new URL('vendor/vibe-usage/upstream-files.json', root), 'utf8'));
-const patched = new Set(['src/parsers/cursor.js', 'src/parsers/antigravity.js', 'src/parsers/codex-cache.js', 'src/parsers/codex.js', 'src/parsers/zcode.js', 'src/parsers/kimi-code.js', 'src/parsers/aggregate.js', 'src/parsers/pi-session-jsonl.js', 'src/parsers/claude-code.js']);
+const patched = new Set(['src/parsers/cursor.js', 'src/parsers/antigravity.js', 'src/parsers/codex-cache.js', 'src/parsers/codex.js', 'src/parsers/zcode.js', 'src/parsers/kimi-code.js', 'src/parsers/aggregate.js', 'src/parsers/pi-session-jsonl.js', 'src/parsers/claude-code.js', 'src/parsers/contract.js']);
 for (const [file, hash] of Object.entries(original)) {
   if (patched.has(file)) continue;
   const bytes = await readFile(new URL(`vendor/vibe-usage/${file}`, root));

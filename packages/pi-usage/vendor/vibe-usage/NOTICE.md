@@ -21,8 +21,9 @@ Local patches:
 | src/parsers/zcode.js | Join tool parts by message_id using EXISTS; require finish=stop for non-tool responses; retain unknown with missing part schema or malformed evidence. |
 | src/parsers/kimi-code.js | Match current step UUID/turn/usage and legacy completed-step evidence; isolate retry/compaction/subagent output and merge classification across existing message-ID deduplication. |
 | src/parsers/aggregate.js | Preserve requestType in bucket grouping; use collision-safe tuple keys. |
-| src/parsers/pi-session-jsonl.js | Classify response usage by tool evidence / completion; preserve classification across duplicate records. |
+| src/parsers/pi-session-jsonl.js | Classify response usage by tool evidence / completion; preserve classification across duplicate records. Invoke the local execution evidence adapter only for native Pi, independently of unchanged token/session accounting. |
 | src/parsers/claude-code.js | Classify response usage; merge tool evidence across content fragments without counting usage again. |
+| src/parsers/contract.js | Pass optional source-validated execution records to local normalization; preserve the legacy result shape for other parsers. |
 
 `upstream-files.json` preserves original source SHA-256 hashes. Other source files are copied
 unchanged. Retained upstream parser tests use PI_USAGE_CACHE_DIR instead of VIBE_USAGE_CACHE_DIR.
@@ -36,6 +37,10 @@ Upload/sync tests do not apply and are not included. Tests are not in the publis
 - ZCode: local message/part schema; tool part.message_id links to the assistant message. tool_usage execution metrics are not model token usage.
 
 Only synthetic records are retained in regression tests; no private log bodies are vendored.
+
+## Execution evidence (local implementation)
+
+The adapter in `src/pi-execution.js` outside this vendor directory was checked against the native Pi session format and `@howaboua/pi-codex-conversion` 3.0.33 `code-mode/{types,trace-store,tool-result}.ts`. The trace store retains at most 50 nested calls and a cumulative `droppedTraceCount`; terminal snapshots restore counts, not missing per-tool outcomes. Exec/wait association uses tool call and runtime cell IDs, with separate pending/unknown coverage and hashed response/session identifiers. This is not an upstream Vibe Usage feature and does not infer billed requests or net savings. No raw trace, message body or tool input is exported.
 
 ## MIT permission notice
 

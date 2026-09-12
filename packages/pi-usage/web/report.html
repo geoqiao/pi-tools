@@ -11,7 +11,7 @@
 <a class="skip" href="#main">跳至分析看板</a>
 <header class="app-header">
   <a class="brand" href="#overview"><span class="brand-mark">π</span><span>Usage<span class="brand-sub">LOCAL ANALYTICS</span></span></a>
-  <nav class="views" aria-label="分析视图"><button data-view="overview" aria-pressed="true"><span data-icon="dashboard"></span>看板</button><button data-view="percentiles" aria-pressed="false"><span data-icon="range"></span>日分布</button><button data-view="simulation" aria-pressed="false"><span data-icon="compare"></span>模型计价</button><button data-view="records" aria-pressed="false"><span data-icon="table"></span>明细</button></nav>
+  <nav class="views" aria-label="分析视图"><button data-view="overview" aria-pressed="true"><span data-icon="dashboard"></span>看板</button><button data-view="percentiles" aria-pressed="false"><span data-icon="range"></span>日分布</button><button data-view="simulation" aria-pressed="false"><span data-icon="compare"></span>模型计价</button><button data-view="records" aria-pressed="false"><span data-icon="table"></span>明细</button><button data-view="execution" aria-pressed="false"><span data-icon="pulse"></span>执行效率</button></nav>
   <div class="actions"><button id="export" class="icon-button" data-icon="download" aria-label="导出当前筛选的日级明细 CSV" title="导出当前筛选的日级明细 CSV"></button><button id="print" class="icon-button" data-icon="print" aria-label="打印当前视图 / PDF" title="打印当前视图 / PDF"></button><button id="info" class="icon-button" data-icon="info" aria-label="来源状态、价格与统计口径" title="来源状态、价格与统计口径"></button></div>
 </header>
 <main id="main">
@@ -65,6 +65,31 @@
     <section class="panel simulation-panel"><div class="panel-head"><span id="simulation-note" class="muted"></span><div class="range-legend"><span>细线 Min–Max</span><span>色带 P25–P75</span><span>● P50</span><span>◇ P90</span></div></div><div id="simulations" class="table-wrap" tabindex="0" aria-label="跨模型每日金额与分位"></div></section>
   </section>
   <section id="records" class="view" aria-label="日级明细" hidden><div class="view-heading"><h1>日级明细</h1><select id="sort" aria-label="明细排序"><option value="date">日期 ↓</option><option value="cost">已知金额 ↓</option><option value="tokens">Token ↓</option></select></div><section class="panel"><div class="panel-head"><span class="muted">日期 × Harness × 模型 × 项目 × 终端 × 请求类型</span><button class="icon-button small" data-help="details" data-icon="info" aria-label="明细与 CSV 导出口径"></button></div><div id="details" class="table-wrap" tabindex="0" aria-label="日级用量明细"></div><div class="pagination"><span id="page-status"></span><button id="previous" class="icon-button" data-icon="left" aria-label="上一页"></button><button id="next" class="icon-button" data-icon="right" aria-label="下一页"></button></div></section></section>
+  <section id="execution" class="view" aria-label="执行效率" hidden>
+    <div class="view-heading"><h1>执行效率</h1><div class="actions"><span id="execution-scope" class="badge"></span><select id="execution-trend-metric" aria-label="执行趋势指标"><option value="meanTools">均值工具数</option><option value="medianTools">中位工具数</option><option value="p75Tools">P75 工具数</option><option value="responseCount">已记录响应</option><option value="exactCoverage">精确样本覆盖</option></select><button id="execution-export" class="text-button" disabled>导出执行 CSV</button><button class="icon-button small" data-help="execution" data-icon="info" aria-label="执行效率口径"></button></div></div>
+    <div class="execution-notice notice">仅统计有执行证据的原生 Pi assistant 响应。其他 Harness、旧导入或缺少 execution 数据显示为无证据，不当作 0；这些响应数也不等于完整 HTTP/API 请求数或计费次数。</div>
+    <div id="execution-empty" class="empty" hidden>当前筛选没有原生 Pi assistant 响应记录。其他来源、旧导入或缺少 execution 数据不代表 0。</div>
+    <div id="execution-data">
+      <section id="execution-metrics" class="execution-metrics" aria-label="执行效率指标">
+        <div class="execution-metric"><span class="eyebrow">批处理覆盖</span><strong id="execution-batch-value" class="number">—</strong><span id="execution-batch-note" class="metric-note"></span></div>
+        <div class="execution-metric"><span class="eyebrow">中位工具数</span><strong id="execution-median-value" class="number">—</strong><span id="execution-median-note" class="metric-note"></span></div>
+        <div class="execution-metric"><span class="eyebrow">均值工具数</span><strong id="execution-mean-value" class="number">—</strong><span id="execution-mean-note" class="metric-note"></span></div>
+        <div class="execution-metric"><span class="eyebrow">已记录 assistant 响应</span><strong id="execution-response-value" class="number">—</strong><span class="metric-note">不等于完整 HTTP/API 请求或计费次数</span></div>
+        <div class="execution-metric"><span class="eyebrow">平均输入</span><strong id="execution-input-value" class="number">—</strong><span id="execution-input-note" class="metric-note"></span></div>
+        <div class="execution-metric"><span class="eyebrow">精确 exec 样本覆盖</span><strong id="execution-exact-value" class="number">—</strong><span id="execution-exact-note" class="metric-note"></span></div>
+      </section>
+      <div class="execution-layout">
+        <section class="panel execution-histogram-panel"><div class="panel-head"><h2><span data-icon="layers"></span>精确 exec 分布</h2><span id="execution-histogram-sample" class="badge"></span></div><div id="execution-histogram" aria-label="每个精确 exec 单元的内部工具数分布"></div><div id="execution-histogram-note" class="panel-foot"></div></section>
+        <section class="panel execution-mode-panel"><div class="panel-head"><h2><span data-icon="terminal"></span>响应证据模式</h2><span class="muted">不是实验分组</span></div><div id="execution-modes" class="table-wrap" tabindex="0" aria-label="按响应证据模式的执行统计"></div><div class="panel-foot">Code Mode / other tools / no tools / unknown 是观测证据，不是配置开关。</div></section>
+        <section class="panel execution-trend-panel"><div class="panel-head"><h2><span data-icon="trend"></span>每日趋势</h2><div class="actions"><span id="execution-trend-sample" class="badge"></span><button class="icon-button small" data-help="execution-trend" data-icon="info" aria-label="执行趋势说明"></button></div></div><div id="execution-trend"></div><div class="chart-footer"><div id="execution-trend-legend" class="legend"></div><span class="muted">点击日期下钻</span></div></section>
+        <section class="panel execution-evidence-panel"><div class="panel-head"><h2><span data-icon="compare"></span>完整度与错误标记（观察下限）</h2><span class="muted">不推断成功率</span></div><div id="execution-evidence" class="execution-statline"></div><div class="panel-foot">pending / unknown 不按 0 计入均值、分位或分布；不完整工具、嵌套错误和 shell 非零数均是 trace 观察下限，不推断成功率或失败率。</div></section>
+      </div>
+      <div class="execution-table-grid">
+        <section class="panel execution-table-panel"><div class="panel-head"><h2><span data-icon="model"></span>模型摘要</h2><span class="muted">合并直方图后计算</span></div><div id="execution-model-table" class="table-wrap" tabindex="0" aria-label="模型执行效率摘要"></div></section>
+        <section class="panel execution-table-panel"><div class="panel-head"><h2><span data-icon="folder"></span>会话摘要</h2><div class="actions"><span class="muted">仅显示哈希前缀</span><button id="execution-session-toggle" class="text-button" hidden aria-expanded="false"></button></div></div><div id="execution-session-table" class="table-wrap" tabindex="0" aria-label="会话执行效率摘要"></div></section>
+      </div>
+    </div>
+  </section>
   <footer><span><span data-icon="lock"></span>本地快照 · 离线可用</span><span id="footer-meta"></span></footer>
 </main>
 <dialog id="information" aria-labelledby="info-title"><div class="dialog-head"><h2 id="info-title">数据与口径</h2><button id="close-info" class="icon-button" data-icon="close" aria-label="关闭信息面板"></button></div><div class="dialog-body"><p id="help-message" class="notice" hidden></p><p id="metadata" class="meta"></p><p id="warnings" class="notice" hidden></p>
@@ -73,7 +98,8 @@
 <details><summary>Token 与金额</summary><p>输入包含缓存写，缓存读取单列；输出不含已拆分的推理。allTokens = 输入 + 缓存读取 + 输出 + 推理；totalTokens 不含缓存读取。Token 不代表产出或生产力。</p><p>金额使用 models.dev 社区价格快照及本地覆盖，按美元 / 百万 Token 估算，不是实际扣款。未知费用为 null，不是免费；部分定价仅显示已知小计。可计价覆盖率按含缓存 Token 计算，不是账单覆盖率。</p><p>无法恢复缓存写入溢价、上下文阶梯、历史调价、批量折扣、媒体费用、税费或订阅抵扣。</p></details>
 <details><summary>请求类型</summary><p>非工具调用请求：完整响应可确认没有工具调用。含工具调用请求：至少包含一次工具调用，文字与调用混合也归此类。其他（无法判定）：缺少响应、无法可靠关联、旧汇总或尚不支持分类的来源。</p><p>整条请求 usage 互斥归类，三类合计等于总量，不逐工具分摊，不表示工具自身用量。占比是含缓存 Token 比例，不是请求次数。Pi / Oh My Pi、Claude Code、Codex、ZCode 和 Kimi Code 已支持有证据的分类：Codex 使用单次响应边界并核对完成账本；ZCode 精确关联 message_id；Kimi 匹配 step 完成证据。不把整个 turn 或相邻工具当作一次请求。累计回退、缺边界、关联冲突、损坏记录及其他未接入来源仍归其他。旧报告需重新读取日志才能补出分类。</p></details>
 <details><summary>日期、分位与模型计价</summary><p>按报告时区归入日期；无记录可能是未使用、日志缺失或读取不全，不能自动视为零。截止日可能未结束。报告是主动查询快照，不做后台更新。</p><p>默认仅有用量日，无记录日按 0 纳入是显式假设。Min / P25 / P50 / P75 / P90 / Max 使用同一样本；分位采用线性插值，各指标不一定来自同一天，极值不是预算边界或预测。完整日金额分位排除未完整定价日期，可能产生样本偏差。</p><p>模型计价固定当前筛选的每天四类 Token，逐日按本报告用过的目标模型费率重新计价，然后计算分位，不把各类 Token 的分位乘价相加。目标费率齐备即可模拟，不要求原模型已定价。这不是实际节省、质量或速度预测。</p></details>
-<details><summary>导出与隐私</summary><p>页面与下载 CSV 按日期 × Harness × 模型 × 项目 × 终端 × 请求类型聚合；同目录 details.csv / usage.json 保持原始粒度。Harness 对应 source 字段，亦包括 Cursor 等来源。</p><p>保留来源级去重，不推断工时或模型级会话关联；会话仅保留在本地 JSON / sessions.csv。来源读取可联网，采集结果不上传；本 HTML 不发起网络请求。</p></details>
+<details><summary>执行效率</summary><p>执行视图仅使用原生 Pi 的 assistant 响应边界与 exec / wait 证据。已记录 assistant 响应不是完整 HTTP/API 请求数，也不是计费次数；其他 Harness 与旧导入没有 execution 证据时显示为无数据，不显示为 0。</p><p>精确 exec 直方图只纳入已完成且可核对的执行单元；pending、unknown 不按零处理。均值、中位数与 P75 仅使用精确样本；批处理覆盖 = ≥2 个内层工具的精确 exec / 精确 exec 总数；精确样本覆盖 = 精确 exec / 已记录 exec（包括 pending 和 unknown）。模式字段是观察到的 code_mode、other_tools、no_tools、unknown 证据，不自动代表配置、实验组、质量、速度或节省。</p><p>incompleteToolCalls、nestedToolErrors 和 shellNonzero 受 trace 丢弃与不完整影响，均为观察到的下限；页面不据此推断成功率或失败率。</p></details>
+<details><summary>导出与隐私</summary><p>Token 明细与顶部下载 CSV 按日期 × Harness × 模型 × 项目 × 终端 × 请求类型聚合；同目录 details.csv / usage.json 保持原始粒度。执行视图的专用 CSV 按响应保留白名单统计、直方图与哈希，不含工具参数、结果或原始 ID。Harness 对应 source 字段，亦包括 Cursor 等来源。</p><p>保留来源级去重，不推断工时或模型级会话用量；会话时长仅保留在本地 JSON / sessions.csv，执行摘要直接按响应中的会话哈希分组。来源读取可联网，采集结果不上传；本 HTML 不发起网络请求。</p></details>
 </div></dialog>
 <noscript>启用 JavaScript 查看报告，或打开同目录 details.csv 查看原始明细。</noscript>
 <script>/*SCRIPT*/</script>

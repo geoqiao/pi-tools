@@ -51,7 +51,7 @@ npx @geoqiao/pi-usage --days 90
 
 ## 看板与分析
 
-四个视图共用筛选条件。可组合日期、Harness、模型、项目、终端和请求类型，也可点击图表下钻，逐项移除筛选或一键重置。
+五个视图共用筛选条件。可组合日期、Harness、模型、项目、终端和请求类型，也可点击图表下钻，逐项移除筛选或一键重置。
 
 | 视图 | 回答的问题 | 主要功能 |
 |---|---|---|
@@ -59,6 +59,7 @@ npx @geoqiao/pi-usage --days 90
 | 日分布 | 平常一天与高用量日差多少？ | Min / P25 / P50 / P75 / P90 / Max、样本数量和每日数值 |
 | 模型计价 | 同样的每日用量，换一套模型费率是多少？ | 逐日重新计价、分位与极值对比；默认按 P50 排序，可切换 P90 / Min / Max |
 | 明细 | 如何核对和继续分析？ | 日级聚合、排序、分页，以及当前筛选结果的 CSV 下载 |
+| 执行效率 | Code Mode 如何组织工具调用？ | exec 批处理覆盖率、均值 / 中位数 / P75、调用直方图、每日趋势、模型与会话汇总、证据覆盖率 |
 
 桌面并列展示核心图表，移动端改为单列。排名默认前 5 项，可展开全部；顶部和图表旁的 ⓘ 说明来源状态、价格出处和统计口径。
 
@@ -91,6 +92,35 @@ Codex 的 `token_usage_record` 仅用于核对完成证据，不叠加到 `token
 
 </details>
 
+### Code Mode 执行效率
+
+当前只解析 **原生 Pi 日志中的 Code Mode 结构化证据**，已对照 `@howaboua/pi-codex-conversion` 3.0.33 的 trace / exec / wait 格式验证。不需要新增实时埋点、修改 Code Mode 设置或调用模型；重新生成报告即可分析已有日志。其他来源、旧版汇总或缺少可识别 Code Mode 结构的 exec 显示无证据 / 未知，**不是零调用，也不是已关闭 Code Mode**。
+
+| 指标 | 分母与含义 |
+|---|---|
+| 批处理覆盖率 | 内层工具数 ≥ 2 的精确 exec 数 ÷ 精确 exec 总数 |
+| 平均内层工具数 | 精确 exec 的内层工具总数 ÷ 精确 exec 总数 |
+| 中位数 / P75 | 合并原始计数直方图后线性插值；不平均各会话中位数，不先把 5+ 桶压成 5 |
+| 精确样本覆盖率 | 可恢复完整调用数的 exec ÷ 已记录 exec；pending、unknown 单独列出 |
+| 已记录 assistant 响应 | 按 provider / model / response ID 去重；无 response ID 时使用会话 / entry ID，仍缺 ID 时按匿名记录保留 |
+| 平均完整输入 | 具有完整 usage 的响应中，`input + cacheRead + cacheWrite` 的平均值；同时展示输入样本覆盖率 |
+
+**这些是执行组织指标，不是省费率。** 已记录响应包含中断、错误与缺少 usage 的记录，不等同于完整 HTTP 请求数或付费请求数。高均值可以来自一次有效批处理，也可以来自循环重试；没有通用的 2.5 次盈亏线。判断是否更省还需要可比任务的完成质量、总 Token、缓存与实际计价证据，本视图不据此推断质量、净节省或因果关系。
+
+<details>
+<summary>执行证据、过滤与缺失值</summary>
+
+- 一个 exec 在多次 wait 后仍只算一次；wait 本身保留为外层调用，不增加 exec 分母。exec 的最终结果归原始调用响应，wait 响应有独立的模型与输入记录，跨午夜也按原始响应时间归属。
+- 内层调用按 exec 运行时记录的工具边界计数，不是 shell 命令条数；工具内部再发出的网络请求或其他模型调用不由此计量。
+- 重复 trace ID 不重复计数。终态快照的保留 trace 数加累计 `droppedTraceCount` 可恢复总调用数，不能再加上早期快照。被截断工具的名称、状态和退出码无法补回；错误计数仅是观测下界。
+- 已识别原生结构的无工具终态才记为 0：该运行时会省略空 `traces` 与为零的 `droppedTraceCount`，包括成功的纯 JS 执行；这不同于整块 Code Mode 结构缺失。未完成归 pending，缺结果、无法关联或矛盾结构归 unknown；累计 dropped 计数在终态回退也归 unknown，不猜测补齐。pending / unknown 已观察到的内层工具数另列为下界，不加入精确直方图。
+- 外层脚本 / exec 错误、内层 trace 错误、`exec_command` 明确非零退出码分别计数。一个执行可能同时有多类错误；未观察到错误不保证成功，不生成统一失败率。
+- 完整输入字段缺失保留 `null`，不按 0 补齐；输入平均值只用有证据的样本。`outputTokens` 是原生日志含 reasoning 的输出总量，只在独立 execution 数据集中使用，不与 Token 明细重复相加。
+- 模型 / 会话汇总使用响应自身的来源与哈希，不猜测会话的模型，不从项目 / 日期拼接 Token 桶。跨文件复制的响应 ID 去重后保留首次观察的归属；匿名记录无法可靠跨文件去重。
+- `mode` 的 `code_mode` / `other_tools` / `no_tools` / `unknown` 描述响应中的已观测证据，不读取配置、不自动识别实验组。筛选到不支持的来源时，没有执行证据，不影响原有 Token 与计价视图。
+
+</details>
+
 ## 命令行
 
 例如，只分析三个来源最近 30 天的用量，按上海时区分组：
@@ -107,7 +137,7 @@ npx @geoqiao/pi-usage --days 30 --timezone Asia/Shanghai \
 | `--sources pi-coding-agent,codex` | 只读取指定来源；默认全部 28 类 |
 | `--out /path/to/empty-directory` | 指定输出目录；非空目录会被拒绝，避免覆盖 |
 | `--offline` | 禁止来源网络请求；Cursor 不可用，Antigravity 仅解析本地 DB |
-| `--input /path/to/usage.json` | 从已有桶和会话重新分析，不读取数据源 |
+| `--input /path/to/usage.json` | 从已有桶、会话及可选 execution 重新分析，不读取数据源 |
 | `--prices /path/to/prices.json` | 用本地完整费率覆盖指定模型 |
 | `--list-sources` / `--help` | 查看来源标识 / 命令帮助 |
 
@@ -117,7 +147,7 @@ npx @geoqiao/pi-usage --days 30 --timezone Asia/Shanghai \
 npx @geoqiao/pi-usage --input /path/to/usage.json --days 90 --offline
 ```
 
-`--input` 接受 `{ "buckets": [...], "sessions": [...] }`，忽略原有费用，按当前本地价格重新计算；其他字段不会保留，也不会自动沿用外部 CSV 的疑似重复标记。来源完整性未验证，日期窗口仍以本次执行日为截止日。
+`--input` 接受 `{ "buckets": [...], "sessions": [...], "execution": [...] }`，忽略原有费用，按当前本地价格重新计算。新导出为 `schemaVersion: 2`；旧文件缺少 `execution` 时按空数组兼容，不能凭旧桶恢复执行证据。execution 只保留白名单统计字段与哈希标识，验证计数守恒与缺失值；聚合计数字段必须完整提供，不把缺字段补成零。其他字段不会保留，也不会自动沿用外部 CSV 的疑似重复标记。来源完整性未验证，日期窗口仍以本次执行日为截止日。
 
 ## 报告与导出
 
@@ -126,11 +156,12 @@ npx @geoqiao/pi-usage --input /path/to/usage.json --days 90 --offline
 | `index.html` | 数据、脚本和样式全部内嵌的交互报告 |
 | `details.csv` | 解析器原始粒度的 Token 与费用明细，保留来源、模型、项目、终端和请求类型 |
 | `sessions.csv` | 会话时长、消息数、开始和结束时间 |
-| `usage.json` | 白名单字段构成的桶、会话、读取状态和价格，供再次离线分析 |
+| `execution.csv` | 响应级执行证据、哈希标识、精确 exec 直方图（JSON 字符串）、pending / unknown 和观测错误计数 |
+| `usage.json` | 白名单字段构成的桶、会话、execution、读取状态和价格，供再次离线分析 |
 
 页面明细和顶部 CSV 下载按 **日期 × Harness × 模型 × 项目 × 终端 × 请求类型** 聚合，导出当前筛选结果；附 `knownCost`（已知小计）、`estimatedCost`（完整金额或空）、`coverage`（可计价 Token 比例）。同目录的 `details.csv` 和 `usage.json` 保留解析器原始粒度，不会随页面筛选变化。
 
-CSV 使用 UTF-8 BOM、标准引号转义与公式注入防护，可在 Excel 中打开。POSIX 上新建报告目录权限为 0700，文件为 0600。**报告包含项目名和终端名，属于私人文件；不要放进自动同步的公共目录。**
+CSV 使用 UTF-8 BOM、标准引号转义与公式注入防护，可在 Excel 中打开。execution 不导出原始会话 / 响应 / 工具 ID、参数、结果、代码或图片，只保留哈希及统计。POSIX 上新建报告目录权限为 0700，文件为 0600。**报告包含项目名和终端名，哈希也可关联记录，属于私人文件；不要放进自动同步的公共目录。**
 
 ## 数据源与隐私
 
@@ -245,7 +276,7 @@ playwright-cli -s=pi-usage run-code --filename=packages/pi-usage/scripts/browser
 playwright-cli -s=pi-usage close
 ```
 
-检查桌面与 390px 移动端、四个视图、组合筛选、下钻、键盘操作、信息对话框焦点、长名称、空状态、未定价、分页与 CSV 数值一致性，并验证零外部请求。合成截图写入 `/tmp/pi-usage-bi-demo-*.png`。验收私有报告时，请从仓库外的临时目录运行浏览器，避免下载和快照进入工作区。
+检查桌面与 390px 移动端、五个视图、组合筛选、下钻、键盘操作、信息对话框焦点、长名称、空状态、未定价、分页与 CSV 数值一致性，以及执行统计的覆盖率、直方图与旧数据空状态，并验证零外部请求。合成截图写入 `/tmp/pi-usage-bi-demo-*.png`。验收私有报告时，请从仓库外的临时目录运行浏览器，避免下载和快照进入工作区。
 
 更新价格需维护者单独下载公开的 `https://models.dev/api.json`，再执行：
 
