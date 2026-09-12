@@ -1,6 +1,6 @@
 {
   "name": "@geoqiao/pi-usage",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "AI coding usage analytics with private, self-contained HTML reports. No usage uploads.",
   "type": "module",
   "license": "MIT",
