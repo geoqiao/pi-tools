@@ -332,15 +332,22 @@ The non-interactive fallback message includes normalized pending questions and o
 
 ## Skill alignment (advisory)
 
-The tool description, `promptSnippet`, `promptGuidelines`, and auto-bundled [`ask-user` skill](../skills/ask-user/SKILL.md) share the same context-first policy. The skill is enabled by default when installed and can be disabled via `pi config`; the tool guidance does not depend on loading it.
+The registered tool guidance is self-contained: it retains the material-gap decision boundary, authorized continuation, prior-answer handling, high-risk approval limits, and essential payload/RPC constraints even if the skill or parameter schema is not visible. The skill is enabled by default and can be disabled via `pi config`.
 
-Read available code, docs, conversation, prior answers, and existing authorization before asking. Use `ask_user` only for a critical requirement still missing/conflicting, an unresolved preference that materially changes the outcome, or missing authorization for a consequential or hard-to-reverse action beyond the approved scope. Explicit requests for interviews, requirements gathering, or interactive questions also use `ask_user`; a requested written questionnaire remains a prose artifact.
+Prompt layers have different responsibilities rather than repeating a full manual:
 
-Do not ask about matters already resolved by context or reconfirm settled choices/authorization. Proceed with reversible steps and ordinary implementation details within scope, stating useful assumptions. Multiple viable options and labels such as architecture, naming, or research alone do not justify asking. Complete clear comparison/research requests first rather than automatically starting an interview. Ask only current blockers (or the current requested interview topic), and reopen settled decisions only for materially new information.
+| Layer | Responsibility |
+| --- | --- |
+| Tool description / snippet | Short purpose and discovery cue |
+| Registered guidelines | Decision boundary and essential operating constraints, independent of skill loading |
+| Parameter schema and validation | Field descriptions and runtime payload checks |
+| [Skill entry](../skills/ask-user/SKILL.md) | Compact boundary and task-specific reference routing |
+| [Interaction guide](../skills/ask-user/references/interaction.md) | Detailed payload, presentation, and follow-up guidance |
+| [Decision cases](../skills/ask-user/references/decision-cases.md) | Borderline examples and model evaluation procedure |
 
-Delegated autonomy does not waive safety boundaries. Cancellation, missing answers, or ambiguous responses are not high-risk approval; leave unauthorized actions blocked. Neither `cancelled: false` nor advisory `required` metadata establishes approval.
+Delegated autonomy does not waive safety boundaries. Cancellation, missing answers, or ambiguous responses are not high-risk approval; leave that action blocked and continue independent authorized work. Neither `cancelled: false` nor advisory `required` metadata establishes approval.
 
-This policy is advisory, not runtime authorization enforcement; contract + tests take precedence for tool behavior. `tests/ask-tool.test.ts` checks the actual registered prompt fields, retained payload/RPC guidance, and removal of old blanket triggers. These are static string checks, not proof of model behavior. The skill records behavioral evaluation cases, including small edits, approved plans, missing requirements, unauthorized high-risk actions, explicit interviews, and ordinary comparisons. Actual evaluation requires model sessions and inspection of context reads, questions, and subsequent actions, with and without the skill; record false positives/negatives separately from static test results.
+This policy is advisory, not runtime authorization enforcement. `tests/ask-tool.test.ts` checks registered guidance, compactness, reference availability, and removal of blanket triggers. These are static checks, not proof of model behavior. Actual evaluation requires model sessions and inspection of context reads, questions, and subsequent actions, with and without the skill; record false positives/negatives separately from static test results.
 
 ## Source of truth
 

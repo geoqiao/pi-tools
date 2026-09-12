@@ -58,11 +58,11 @@ These commands are TUI-only. Replay is branch-aware and works with `/resume` and
 
 ### When the agent asks
 
-The agent should read available code, docs, conversation, and prior answers first. It asks only for unresolved critical requirements, outcome-changing preferences, or consequential/hard-to-reverse actions beyond existing authorization. Explicitly requested interviews, requirements gathering, and interactive questions also use `ask_user`.
+The agent checks relevant context first. It asks only for unresolved critical requirements, outcome-changing preferences, or consequential/hard-to-reverse actions beyond existing authorization. Explicitly requested interviews, requirements gathering, and interactive questions also use `ask_user`.
 
 Clear small changes, settled choices, authorized reversible steps, and routine implementation details proceed without reconfirmation. Multiple options or architecture/naming/research labels alone do not trigger questions; clear comparison/research requests get analysis first. Follow-ups address only current blockers, and settled decisions reopen only for materially new information.
 
-Delegated autonomy does not waive safety boundaries. Cancellation, skipped questions, and unclear answers are not high-risk approval. This is prompt guidance, **not a runtime permission check or a guarantee of model behavior**. See the [policy and verification limits](docs/contract.md#skill-alignment-advisory) and [skill examples](skills/ask-user/SKILL.md#examples-and-behavioral-evaluation-cases).
+Delegated autonomy does not waive safety boundaries. Cancellation, skipped questions, and unclear answers are not high-risk approval. This is prompt guidance, **not a runtime permission check or a guarantee of model behavior**. The tool's compact guidance works without loading the skill; the skill routes to interaction details and examples only when needed. See the [policy and verification limits](docs/contract.md#skill-alignment-advisory) and [decision cases](skills/ask-user/references/decision-cases.md).
 
 ## TUI and RPC
 
@@ -136,7 +136,7 @@ In non-empty editors, arrows and `Tab` stay with the text. On the review tab, `1
 | [Contract](docs/contract.md) | Input/output, TUI/RPC behavior, replay, and recovery guarantees |
 | [Architecture](docs/architecture.md) | Module responsibilities and invariants |
 | [Remote events](docs/remote-events.md) | Trusted local inter-extension integration |
-| [Ask User skill](skills/ask-user/SKILL.md) | Context-first clarification policy and behavioral evaluation cases |
+| [Ask User skill](skills/ask-user/SKILL.md) | Compact decision boundary and on-demand interaction/evaluation references |
 
 The bundled skill is enabled by default when installed and can be disabled through `pi config`. Tool guidance remains available without it.
 
