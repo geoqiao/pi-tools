@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 const root = new URL('../', import.meta.url);
 // Plain JavaScript package: workspace typecheck hook runs syntax checks, not TypeScript inference.
 for (const file of await readdir(root, { recursive: true })) {
-  if (!file.endsWith('.js') || file === 'scripts/browser-check.js') continue;
+  if (!file.endsWith('.js')) continue;
   execFileSync(process.execPath, ['--check', fileURLToPath(new URL(file, root))], { stdio: 'pipe' });
 }
 const original = JSON.parse(await readFile(new URL('vendor/vibe-usage/upstream-files.json', root), 'utf8'));

@@ -1,4 +1,6 @@
-async page => {
+import { join } from 'node:path';
+
+export default async function checkReport(page, { data, shortData, legacyData, screenshotDir }) {
   // Synthetic demo reports only; never open a private report or a real session export.
   const errors = [], requests = [];
   const onError = error => errors.push(error.message);
@@ -16,10 +18,6 @@ async page => {
     await page.waitForTimeout(25);
   };
   const clearFocus = () => page.evaluate(() => document.activeElement?.blur());
-  const readData = () => page.evaluate(() => {
-    const match = document.querySelector('script').textContent.match(/const DATA = ([\s\S]*?);\nconst \$/);
-    return JSON.parse(match[1]);
-  });
   const sum = rows => rows.reduce((total, row) => total + row.allTokens, 0);
   const selectTotal = (data, from, to, filters = {}) => sum(data.buckets.filter(row => row.date >= from && row.date <= to
     && Object.entries(filters).every(([key, value]) => !value || row[key] === value)));
@@ -28,7 +26,6 @@ async page => {
   await page.goto(initialURL);
   await page.reload();
   await page.setViewportSize({ width: 1440, height: 1050 });
-  const data = await readData();
   check(await page.locator('.views [data-view]').count() === 4 && !await page.locator('.views [data-view="execution"]').count(), 'Execution remains a fifth primary navigation view');
   const expectedTotal = selectTotal(data, data.from, data.to);
   check(await page.locator('#total-value').getAttribute('data-value') === String(expectedTotal), 'UI total differs from synthetic snapshot');
@@ -44,12 +41,18 @@ async page => {
   check((await page.locator('#total-value').textContent()).includes('M') && (await page.locator('#net-value').textContent()).includes('M'), 'Top Token values are not in M');
   check((await page.locator('.token-part strong').allTextContents()).every(text => text.includes('M')), 'Top Token composition is not in M');
 
+  // Hidden views and collapsed diagnostics must not be eagerly populated.
+  // These are observable DOM assertions, not production counters/test hooks.
+  const unopened = ['#quantile-charts .summary-stat', '#simulations tbody tr', '#details tbody tr', '#execution-histogram .execution-bin', '#counterfactual-sensitivity tbody tr'];
+  for (const selector of unopened) check(await page.locator(selector).count() === 0, `Hidden analysis rendered at startup: ${selector}`);
+
   // Named ranges are inclusive, end at the report cutoff, and never clip to the available window.
   for (const [preset, from] of [['7', '2026-08-30'], ['30', '2026-08-07'], ['90', '2026-06-08'], ['all', '2026-06-08']]) {
     await page.locator(`[data-days="${preset}"]`).click();
     check(await page.locator('#from').inputValue() === from && await page.locator('#to').inputValue() === data.to, `${preset}D dates are not anchored to report cutoff`);
     check((await activePresets().count()) === 1 && await activePresets().first().getAttribute('data-days') === preset, `${preset}D active feedback is not unique`);
     check(await page.locator('#total-value').getAttribute('data-value') === String(selectTotal(data, from, data.to)), `${preset}D raw total differs`);
+    for (const selector of unopened) check(await page.locator(selector).count() === 0, `Date filter eagerly rendered hidden analysis: ${selector}`);
   }
   await page.locator('#reset').click();
 
@@ -63,12 +66,11 @@ async page => {
   await page.locator('#reset').click();
 
   // Request classification is response-level usage, not independent execution count.
-  const requestTotals = await page.evaluate(() => {
+  const requestTotals = (() => {
     const types = ['non_tool', 'tool', 'other'];
-    const data = JSON.parse(document.querySelector('script').textContent.match(/const DATA = ([\s\S]*?);\nconst \$/)[1]);
     const rows = data.buckets.filter(row => row.date >= data.from && row.date <= data.to);
     return Object.fromEntries(types.map(type => [type, rows.filter(row => (row.requestType ?? 'other') === type).reduce((n, row) => n + row.allTokens, 0)]));
-  });
+  })();
   check(Object.values(requestTotals).reduce((a, b) => a + b, 0) === expectedTotal, 'Tool-call classification lost Token usage');
   check((await page.locator('#classification-note').textContent()).includes('不是执行次数'), 'Tool-call response-level disclaimer missing');
 
@@ -81,15 +83,14 @@ async page => {
   await page.locator('#export').click();
   const csvDownload = await csvDownloadPromise;
   check(csvDownload.suggestedFilename().startsWith('pi-usage-daily-') && await csvDownload.failure() === null, 'Daily CSV download failed');
-  const csvCheck = await page.evaluate(async () => {
+  const csvCheck = await page.evaluate(async source => {
     const text = await window.__qaCsv.text();
     const cells = [...text.matchAll(/"((?:[^"]|"")*)"(?=,|\r\n|$)/g)].map(match => match[1].replaceAll('""', '"'));
     const headers = cells.slice(0, 15), rows = [];
     for (let index = 15; index < cells.length; index += 15) rows.push(cells.slice(index, index + 15));
     const allIndex = headers.indexOf('allTokens');
-    const source = JSON.parse(document.querySelector('script').textContent.match(/const DATA = ([\s\S]*?);\nconst \$/)[1]);
     return { headers, rows, rawTotal: rows.reduce((n, row) => n + Number(row[allIndex]), 0), expected: source.buckets.reduce((n, row) => n + row.allTokens, 0), firstRaw: rows[0]?.[allIndex] };
-  });
+  }, data);
   check(csvCheck.headers.length === 15 && csvCheck.rawTotal === csvCheck.expected && /^\d+$/.test(csvCheck.firstRaw), 'CSV token values were formatted for display');
 
   await view('percentiles');
@@ -103,6 +104,7 @@ async page => {
   });
   check(distributionHeight.difference < 180, 'Daily distribution cards still have a large equal-height blank area');
   await page.locator('#token-quantile-details summary').click();
+  await page.locator('#quantiles tbody tr').first().waitFor({ state: 'attached' });
   check(await page.locator('#quantiles tbody tr').count() === 6 && (await page.locator('#quantiles').textContent()).includes('M'), 'Collapsed full six-metric Token table missing or not in M');
   check((await page.locator('#quantiles th').allTextContents()).some(text => text.includes('M')), 'Token percentile headings do not declare M');
   await page.locator('#token-quantile-details summary').click();
@@ -158,11 +160,27 @@ async page => {
 
   await page.locator('#counterfactual-assumptions > summary').click();
   await page.locator('#counterfactual-advanced summary').click();
+  await page.locator('#counterfactual-sensitivity tbody tr').first().waitFor({ state: 'attached' });
   check(await page.locator('#counterfactual-sensitivity tbody tr').count() === 6, 'Counterfactual sensitivity rows missing');
   check((await page.locator('[data-token-note="counterfactual-extra-output"]').textContent()).includes('M'), 'Raw Token parameter M equivalence note missing');
+  await page.locator('#counterfactual-assumptions > summary').click();
   await page.locator('#counterfactual-batching').selectOption('2');
   check(await page.locator('#counterfactual-comparison').getAttribute('data-delta-total-tokens') !== defaultDelta, 'Batching control did not change counterfactual numbers');
+  await page.locator('#counterfactual-assumptions > summary').click();
+  await page.waitForFunction(() => document.querySelector('#counterfactual-sensitivity tbody tr:nth-child(5) td:nth-child(3)')?.textContent.includes('2'));
+  check((await page.locator('#counterfactual-sensitivity tbody tr').nth(4).locator('td').nth(2).textContent()).includes('2'), 'Reopened sensitivity retained stale batching parameters');
   await page.locator('#counterfactual-extra-output').fill('10');
+  const redundantRenders = await page.evaluate(async () => {
+    let mutations = 0;
+    const observer = new MutationObserver(records => { mutations += records.length; });
+    observer.observe(document.querySelector('#counterfactual-comparison'), { childList: true, subtree: true });
+    // Number inputs emit input while editing, then change when committed.
+    document.querySelector('#counterfactual-extra-output').dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(resolve => queueMicrotask(resolve));
+    observer.disconnect();
+    return mutations;
+  });
+  check(redundantRenders === 0, 'Committing an unchanged numeric input rendered the same cost scenario twice');
   await page.locator('#counterfactual-tool-context').fill('5');
   check((await page.locator('#counterfactual-default-caption').textContent()).includes('不表示实测为零'), 'Advanced assumption caption missing');
   await page.locator('#counterfactual-extra-output').fill('0'); await page.locator('#counterfactual-tool-context').fill('0');
@@ -201,9 +219,9 @@ async page => {
   // Diagnostic metrics remain available but are folded away from the primary reading path.
   check(!await page.locator('#execution-diagnostics').getAttribute('open'), 'Execution diagnostics should be folded by default');
   await page.locator('#execution-diagnostics summary').click();
+  await page.locator('#execution-histogram .execution-bin').first().waitFor({ state: 'attached' });
   check(await page.locator('#execution-data').isVisible() && await page.locator('#execution-histogram .execution-bin').count() === 6, 'Execution diagnostics did not expand');
-  const executionShape = await page.evaluate(() => {
-    const data = JSON.parse(document.querySelector('script').textContent.match(/const DATA = ([\s\S]*?);\nconst \$/)[1]);
+  const executionShape = (() => {
     const bins = [0, 0, 0, 0, 0, 0];
     for (const row of data.execution.filter(item => item.date >= data.from && item.date <= data.to)) {
       for (const [tools, count] of Object.entries(row.execHistogram ?? {})) bins[Math.min(5, Number(tools))] += count;
@@ -211,7 +229,7 @@ async page => {
     const complete = bins.reduce((total, count) => total + count, 0);
     const multi = bins.slice(2).reduce((total, count) => total + count, 0);
     return { bins, batchRate: complete ? multi / complete : null };
-  });
+  })();
   const renderedHistogram = await page.locator('#execution-histogram .execution-bin-value').allTextContents()
     .then(values => values.map(value => Number(value.replaceAll(',', ''))));
   check(JSON.stringify(renderedHistogram) === JSON.stringify(executionShape.bins), 'Execution histogram values do not match synthetic evidence');
@@ -224,6 +242,20 @@ async page => {
   check(executionDownload.suggestedFilename().startsWith('pi-usage-execution-') && await executionDownload.failure() === null, 'Execution CSV download failed');
   await page.locator('#execution-diagnostics summary').click();
 
+  // A previously populated, then hidden panel must catch up with the latest
+  // filter when reopened. Compare against fixture counts, not a UI snapshot.
+  await page.locator('[data-days="7"]').click();
+  await page.locator('#execution-diagnostics summary').click();
+  await page.locator('#execution-histogram .execution-bin').first().waitFor({ state: 'attached' });
+  const recentBins = [0, 0, 0, 0, 0, 0];
+  for (const row of data.execution.filter(row => row.date >= '2026-08-30' && row.date <= data.to)) {
+    for (const [tools, count] of Object.entries(row.execHistogram ?? {})) recentBins[Math.min(5, Number(tools))] += count;
+  }
+  check(JSON.stringify(await page.locator('#execution-histogram .execution-bin-value').allTextContents()
+    .then(values => values.map(value => Number(value.replaceAll(',', ''))))) === JSON.stringify(recentBins), 'Reopened diagnostics retained stale date-filter counts');
+  await page.locator('#execution-diagnostics summary').click();
+  await page.locator('#reset').click();
+
   // A Harness filter with no execution evidence keeps the usage dashboard intact.
   await page.locator('#source').selectOption('codex');
   check(Number(await page.locator('#total-value').getAttribute('data-value')) === selectTotal(data, data.from, data.to, { source: 'codex' })
@@ -235,7 +267,6 @@ async page => {
   // The demo generator writes this required sibling fixture beside the arbitrary
   // initial report directory. Missing or malformed fixtures fail the check.
   await page.goto(shortURL);
-  const shortData = await readData();
   const shortRange = await page.evaluate(() => {
     const from = document.querySelector('#from').value, to = document.querySelector('#to').value;
     return { from, to, days: Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86400000) + 1 };
@@ -248,7 +279,6 @@ async page => {
   // A legacy report without execution or collection-scope metadata remains an
   // explicit no-evidence state and cannot masquerade as all-source collection.
   await page.goto(legacyURL);
-  const legacyData = await readData();
   check(!Object.hasOwn(legacyData, 'execution') && !Object.hasOwn(legacyData, 'collectionScope'), 'Legacy fixture unexpectedly gained new metadata');
   check(await page.locator('#collection-scope').textContent() === '采集范围未记录', 'Legacy collection scope was presented as known');
   check((await page.locator('#collection-scope-detail').textContent()).includes('不能证明全来源'), 'Legacy collection scope limitation is missing');
@@ -260,11 +290,11 @@ async page => {
   // Responsive pass and screenshots are synthetic evidence for README review.
   await page.setViewportSize({ width: 1440, height: 1050 });
   await page.locator('#reset').click(); await page.evaluate(() => window.scrollTo(0, 0)); await clearFocus();
-  await page.screenshot({ path: '/tmp/pi-usage-bi-demo-overview.png', fullPage: true });
-  await view('percentiles'); await clearFocus(); await page.screenshot({ path: '/tmp/pi-usage-bi-demo-percentiles.png', fullPage: true });
+  await page.screenshot({ path: join(screenshotDir, 'overview.png'), fullPage: true });
+  await view('percentiles'); await clearFocus(); await page.screenshot({ path: join(screenshotDir, 'percentiles.png'), fullPage: true });
   await view('overview'); await page.locator('#execution-diagnostics summary').click();
   await page.locator('#execution-diagnostics summary').click(); await page.evaluate(() => { window.location.hash = '#execution'; }); await page.waitForTimeout(60); await clearFocus();
-  await page.screenshot({ path: '/tmp/pi-usage-bi-demo-codemode.png', fullPage: true });
+  await page.screenshot({ path: join(screenshotDir, 'codemode.png'), fullPage: true });
   for (const width of [1440, 1024, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1050 });
     for (const name of ['overview', 'percentiles', 'simulation', 'records']) {
@@ -309,9 +339,9 @@ async page => {
   check(Number(await page.locator('#total-value').getAttribute('data-value')) === expectedTotal
     && await page.locator('#total-value').textContent() !== '999,999.999999 M', 'Stress mutation leaked into the final screenshot');
   await clearFocus();
-  await page.screenshot({ path: '/tmp/pi-usage-bi-demo-mobile.png', fullPage: true });
+  await page.screenshot({ path: join(screenshotDir, 'mobile.png'), fullPage: true });
   check(errors.length === 0, errors.join('\n'));
   check(requests.length === 0, `External requests: ${requests.length}`);
   page.off('pageerror', onError); page.off('request', onRequest);
-  return { passed: true, total: expectedTotal, shortFixture: true, legacyFixture: true, screenshots: ['/tmp/pi-usage-bi-demo-overview.png', '/tmp/pi-usage-bi-demo-percentiles.png', '/tmp/pi-usage-bi-demo-codemode.png', '/tmp/pi-usage-bi-demo-mobile.png'], externalRequests: requests.length, errors };
+  return { passed: true, total: expectedTotal, shortFixture: true, legacyFixture: true, screenshots: ['overview.png', 'percentiles.png', 'codemode.png', 'mobile.png'].map(name => join(screenshotDir, name)), externalRequests: requests.length, errors };
 }

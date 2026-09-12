@@ -45,7 +45,11 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js vendor/vibe-usage/test/*.test.js",
+    "browser:test": "node scripts/browser-test.js",
     "typecheck": "node scripts/check.js",
     "pack:check": "npm pack --dry-run"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
   }
 }
