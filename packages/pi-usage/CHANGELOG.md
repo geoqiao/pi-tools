@@ -1,5 +1,11 @@
 # @geoqiao/pi-usage
 
+## 0.3.1
+
+### Patch Changes
+
+- 3dbf280: Clarify all-source versus selected/import report scope and prevent silently clipped date presets. Reorganize the dashboard into overall usage, distributions, and Code Mode cost impact; simplify daily distributions and consistently display tokens in millions while preserving raw exports and estimator formulas.
+
 ## 0.3.0
 
 ### Minor Changes
