@@ -38,6 +38,7 @@ export function normalizeExecutionRows(raw, { timeZone, hostname = 'unknown' }) 
     for (const key of ['fullInputTokens','cacheReadTokens','outputTokens']) row[key] = item[key] == null ? null : executionCount(item[key]);
     if (row.fullInputTokens !== null && row.cacheReadTokens !== null && row.cacheReadTokens > row.fullInputTokens) throw new Error('缓存不能大于完整输入');
     for (const key of EXECUTION_COUNTS) row[key] = executionCount(item[key] ?? 0);
+    if (executionCount(row.execCalls + row.waitCalls) > row.outerToolCalls) throw new Error('exec / wait 不能超过外层工具总数');
     if (!item.execHistogram || typeof item.execHistogram !== 'object' || Array.isArray(item.execHistogram)) throw new Error('缺少exec直方图');
     row.execHistogram = {};
     for (const [key,value] of Object.entries(item.execHistogram)) {
@@ -108,4 +109,3 @@ export function groupExecution(rows, key) {
   }
   return [...groups].map(([name,items]) => ({ name,...summarizeExecution(items) }));
 }
-

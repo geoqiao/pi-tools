@@ -33,12 +33,12 @@ for (let d = 0; d < 90; d++) {
     if (d % 10 !== 0) execution.push(executionBase(date, d, 0, {
       model: d % 4 === 0 ? 'execution-only-preview' : 'gpt-5.4', project: d % 4 === 0 ? 'execution-only-project' : 'execution-lab',
       requestType: 'tool', mode: 'code_mode', fullInputTokens: 18000 + d * 73, cacheReadTokens: 6200 + d * 19, outputTokens: 640 + d,
-      outerToolCalls: 3, execCalls: 3, waitCalls: 1, execHistogram: { 0: 1, 1: 1, 5: 1 },
+      outerToolCalls: 4, execCalls: 3, waitCalls: 1, execHistogram: { 0: 1, 1: 1, 5: 1 },
     }));
     execution.push(executionBase(date, d, 1, {
       model: d % 3 === 0 ? 'claude-sonnet-4-6' : 'gpt-5.4', project: 'execution-lab',
       requestType: 'tool', mode: 'code_mode', fullInputTokens: d % 2 ? 21000 + d * 41 : null, cacheReadTokens: d % 2 ? 5000 + d * 11 : null, outputTokens: d % 2 ? 820 + d : null,
-      outerToolCalls: 2, execCalls: 2, waitCalls: 1, execHistogram: d % 10 === 0 ? {} : { 2: 1 }, pendingExecs: d % 10 === 0 ? 2 : 1, incompleteToolCalls: 1,
+      outerToolCalls: 3, execCalls: 2, waitCalls: 1, execHistogram: d % 10 === 0 ? {} : { 2: 1 }, pendingExecs: d % 10 === 0 ? 2 : 1, incompleteToolCalls: 1,
     }));
     execution.push(executionBase(date, d, 2, {
       model: 'execution-only-preview', project: 'execution-only-project', requestType: 'tool', mode: 'code_mode',
@@ -54,7 +54,7 @@ for (let d = 0; d < 90; d++) {
       fullInputTokens: 11000 + d * 13, cacheReadTokens: 1500 + d * 2, outputTokens: 260 + d, outerToolCalls: 1,
     }));
     execution.push(executionBase(date, d, 5, {
-      model: 'execution-only-preview', project: 'execution-only-project', requestType: 'other', mode: 'unknown',
+      model: 'execution-only-preview', project: 'execution-only-project', requestType: 'tool', mode: 'unknown',
       fullInputTokens: null, cacheReadTokens: null, outputTokens: null, outerToolCalls: 1, execCalls: 1, unknownExecs: 1,
     }));
   }

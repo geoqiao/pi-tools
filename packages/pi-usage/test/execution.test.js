@@ -21,6 +21,7 @@ test('execution normalizer is allow-listed, nullable, timezone-aware and validat
   assert.throws(() => normalizeExecutionRows([sample({ execHistogram: { '-1': 3 } })], { timeZone: 'UTC' }));
   assert.throws(() => normalizeExecutionRows([sample({ fullInputTokens: -1 })], { timeZone: 'UTC' }));
   assert.throws(() => normalizeExecutionRows([sample({ cacheReadTokens: 200 })], { timeZone: 'UTC' }));
+  assert.throws(() => normalizeExecutionRows([sample({ waitCalls: 1 })], { timeZone: 'UTC' }), /外层/);
 });
 
 test('histograms merge before quantiles, with pending and unknown outside the exact denominator', () => {
