@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/pi-tools-logo-v1.png" alt="pi-tools — a lime-green pixel toolbox and wordmark on a dark background" width="640">
+
 # pi-tools
 
 **Focused packages for better conversations and cleaner workflows in [Pi](https://pi.dev).**

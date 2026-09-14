@@ -4,3 +4,4 @@ node_modules/
 .zed/private.json
 coverage/
 .playwright-cli/
+/.scratch/
