@@ -23,13 +23,18 @@ import { parse as parseKiro } from './kiro.js';
 import { parse as parseMcode } from './mcode.js';
 import { parse as parseMimocode } from './mimocode.js';
 import { parse as parsePiCodingAgent } from './pi-coding-agent.js';
+import { parse as parseCola } from './cola.js';
 import { parse as parseZcode } from './zcode.js';
 import { parse as parseTraeCli } from './trae-cli.js';
 import { parse as parseWorkbuddy } from './workbuddy.js';
+import { parseQoder, parseQoderCn } from './qoder.js';
+import { parse as parseDevin } from './devin.js';
+import { parse as parseCodebuddy } from './codebuddy.js';
 
 export const parsers = {
   'claude-code': parseClaudeCode,
   'codex': parseCodex,
+  'cola': parseCola,
   'grok': parseGrok,
   'copilot-cli': parseCopilotCli,
   'craft-agent': parseCraftAgent,
@@ -40,6 +45,8 @@ export const parsers = {
   'openclaw': parseOpenclaw,
   'omp': parseOmp,
   'pi-coding-agent': parsePiCodingAgent,
+  'qoder': parseQoder,
+  'qoder-cn': parseQoderCn,
   'qwen-code': parseQwenCode,
   'kimi-code': parseKimiCode,
   'amp': parseAmp,
@@ -56,6 +63,8 @@ export const parsers = {
   'roo-code': parseRooCode,
   'workbuddy': parseWorkbuddy,
   'zcode': parseZcode,
+  'devin': parseDevin,
+  'codebuddy': parseCodebuddy,
 };
 
 export { roundToHalfHour, aggregateToBuckets, extractSessions } from './aggregate.js';

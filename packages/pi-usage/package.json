@@ -20,6 +20,7 @@
     "vendor/vibe-usage/NOTICE.md",
     "vendor/vibe-usage/upstream-files.json",
     "extensions",
+    "docs/quotas.md",
     "README.md",
     "LICENSE"
   ],

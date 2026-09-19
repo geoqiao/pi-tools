@@ -1,0 +1,54 @@
+{
+  "upstream": {
+    "repository": "https://github.com/vibe-cafe/vibe-usage",
+    "packageVersion": "0.11.1",
+    "commit": "4a4dcc09f1510c7c732525a9e736068c60ff2a36"
+  },
+  "files": {
+    "schema.js": {
+      "upstreamPath": "src/quotas/schema.js",
+      "status": "adapted",
+      "upstreamSha256": "95b11fe6db95cbf3c4419f5cea54b2e5a2cc30d0ef9baadacc9fb6e9ee9f24f6",
+      "localSha256": "282ec81b1c199c708fb1a9ab62be0b3e4dca72510f4956a6dc5a5309c5bd3b52"
+    },
+    "registry.js": {
+      "upstreamPath": "src/quotas/registry.js",
+      "status": "adapted",
+      "upstreamSha256": "7b3e164426771add95105c34f6807327bd359dcb709181fc30408bfb6a42fa11",
+      "localSha256": "56c46ca34098ca85015f4b2775ae46a3cd542230964ae4efb35e956473275194"
+    },
+    "cache.js": {
+      "upstreamPath": "src/quotas/cache.js",
+      "status": "adapted",
+      "upstreamSha256": "73d0900b126362ffe754345c8ae3f34c2724588a788e425c228b8aa0df4888d7",
+      "localSha256": "6c3cfb66b9b4ba091345f4ef3dded7ade86648cb0d9bfeab96f94893c23e3d3f"
+    },
+    "index.js": {
+      "upstreamPath": "src/quotas/index.js",
+      "status": "adapted",
+      "upstreamSha256": "2f1b1adeab6c74faf35856fa21e4eaa652fb0234d436e1c16d2b055cb01e13cd",
+      "localSha256": "ddfa04714f9f112f1754103d6c0bc61925ff5707ea369f981689aaf0ed72783a"
+    },
+    "providers/kimi-code.js": {
+      "upstreamPath": "src/quotas/providers/kimi-code.js",
+      "status": "adapted",
+      "upstreamSha256": "540adb8420024e1b3870505ac59d2af27c61e06184a66e74c3161227d654b6ea",
+      "localSha256": "5f43d41df0feb4397ee9134f586ed1b2740d4d097ccd50b344636023474c2283"
+    },
+    "providers/zai.js": {
+      "upstreamPath": "src/quotas/providers/zai.js",
+      "status": "adapted",
+      "upstreamSha256": "ad872121fe19b3f4fdd4a944756b579d49d9ccf83ca4db061ed223671ab38dcd",
+      "localSha256": "6f3a5faf918daee7f5ab131148ca3437725d98fbcb0b1666eb6024545374928b"
+    },
+    "providers/grok.js": {
+      "upstreamPath": "src/quotas/providers/grok.js",
+      "status": "adapted",
+      "upstreamSha256": "5727c24f44ad8d889b81d5e12b601ed6c6d58c20f178dd7271721ab1a878a363",
+      "localSha256": "e5b09b6997c7956d3656d98cb6f52488b70d4e322374677cbd9a0b4f11633131"
+    },
+    "network.js": {
+      "status": "local-boundary"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendFileSync, chmodSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { parse } from '../src/parsers/codex.js';
@@ -803,7 +803,7 @@ test('configured Codex container with no task homes skips the source', async () 
 });
 
 test('unreadable directory inside a configured Codex home skips the source', {
-  skip: process.platform === 'win32',
+  skip: process.platform === 'win32' && 'POSIX chmod fixture: Windows requires a separate ACL denial test',
 }, async () => {
   const root = mkdtempSync(join(tmpdir(), 'vibe-usage-codex-unreadable-container-'));
   const primary = join(root, 'primary');
@@ -1127,6 +1127,211 @@ test('a cold build checkpoints between files and resumes after its work budget',
       assert.ok(complete.cache.headerHits > 0);
     });
   } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('same-ID active continuation contributes usage even when its older segment is longer', async () => {
+  const t = '2026-09-06T00:00:00.000Z';
+  const header = [sessionMeta(t, 'segments'), { type: 'turn_context', timestamp: t, payload: { model: 'test-model' } }];
+  const records = [tokenCount('2026-09-06T00:01:00.000Z', usage(10, 0, 0, 0), 10),
+    tokenCount('2026-09-06T00:02:00.000Z', usage(10, 0, 0, 0), 20),
+    tokenCount('2026-09-06T00:03:00.000Z', usage(10, 0, 0, 0), 30)];
+  const result = await parseFixture({ 'a.jsonl': [...header, ...records.slice(0, 2)], 'b.jsonl': [...header, records[2]] });
+  assert.equal(sumBuckets(result.buckets).input, 30);
+  assert.equal(result.sessions.length, 1);
+});
+
+test('overlapping Codex segments preserve cumulative-only baselines, resets, and one logical session', async () => {
+  const t = '2026-09-06T00:00:00.000Z';
+  const header = [sessionMeta(t, 'segments'), { type: 'turn_context', timestamp: t, payload: { model: 'test-model' } }];
+  const a = tokenCountInfo('2026-09-06T00:01:00.000Z', { total_token_usage: usage(10, 0, 0, 0) });
+  const b = tokenCountInfo('2026-09-06T00:02:00.000Z', { total_token_usage: usage(20, 0, 0, 0) });
+  const c = tokenCountInfo('2026-09-06T00:03:00.000Z', { total_token_usage: usage(30, 0, 0, 0) });
+  const reset = tokenCountInfo('2026-09-06T00:04:00.000Z', { total_token_usage: usage(5, 0, 0, 0) });
+  const next = tokenCountInfo('2026-09-06T00:05:00.000Z', { total_token_usage: usage(8, 0, 0, 0) });
+  const result = await parseFixture({ 'a.jsonl': [...header, a, b], 'b.jsonl': [...header, b, c, reset, next],
+    'copy.jsonl': { records: [...header, a, b], archived: true } });
+  assert.equal(sumBuckets(result.buckets).input, 38);
+  assert.equal(result.sessions.length, 1);
+});
+
+test('Codex segment model/tier contexts survive tied header timestamps and file-name reversal', async () => {
+  const t = '2026-09-06T00:00:00.000Z';
+  const make = (model, service_tier, minute, total) => [sessionMeta(t, 'segments'),
+    { type: 'turn_context', timestamp: t, payload: { model, service_tier } },
+    tokenCountInfo(`2026-09-06T00:0${minute}:00.000Z`, { last_token_usage: usage(10, 0, 0, 0), total_token_usage: usage(total, 0, 0, 0) })];
+  const a = make('model-a', 'priority', 1, 10), b = make('model-b', 'flex', 2, 20);
+  const first = await parseFixture({ 'a.jsonl': a, 'b.jsonl': b });
+  const reversed = await parseFixture({ 'b.jsonl': a, 'a.jsonl': b });
+  assert.deepEqual(first.buckets, reversed.buckets);
+  assert.equal(first.buckets.find(b => b.model === 'model-a-priority')?.inputTokens, 10);
+  assert.equal(first.buckets.find(b => b.model === 'model-b-flex')?.inputTokens, 10);
+});
+
+test('exact cross-file dedup retains single-file repetitions and distinct equal-sized calls', async () => {
+  const t = '2026-09-06T00:00:00.000Z';
+  const repeated = tokenCount(t, usage(10, 0, 0, 0), 0);
+  const later = tokenCount('2026-09-06T00:01:00.000Z', usage(10, 0, 0, 0), 0);
+  const result = await parseFixture({ 'a.jsonl': [sessionMeta(t, 'segments'), repeated, repeated],
+    'b.jsonl': [sessionMeta(t, 'segments'), repeated, later] });
+  assert.equal(sumBuckets(result.buckets).input, 30);
+});
+
+test('fork replay matches a parent spread over multiple continuation files', async () => {
+  const t = '2026-09-06T00:00:00.000Z';
+  const a = tokenCount('2026-09-06T00:01:00.000Z', usage(10, 0, 0, 0), 10);
+  const b = tokenCount('2026-09-06T00:02:00.000Z', usage(10, 0, 0, 0), 20);
+  const childTime = '2026-09-06T00:03:00.000Z';
+  const child = [sessionMeta(childTime, 'child', { forked_from_id: 'parent' }),
+    { ...a, timestamp: childTime }, { ...b, timestamp: childTime },
+    tokenCount('2026-09-06T00:04:00.000Z', usage(5, 0, 0, 0), 25)];
+  const result = await parseFixture({ 'a.jsonl': [sessionMeta(t, 'parent'), a],
+    'b.jsonl': [sessionMeta(t, 'parent'), b], 'child.jsonl': child,
+    'child-copy.jsonl': { records: child, archived: true } });
+  assert.equal(sumBuckets(result.buckets).input, 25);
+  assert.equal(result.sessions.length, 2);
+});
+
+test('Codex segment cache follows appends to either file, removal, and no-cache parity', async () => {
+  const t = '2026-09-06T00:00:00.000Z';
+  const fixture = createPersistentFixture({
+    'a.jsonl': [sessionMeta(t, 'segments'), tokenCount(t, usage(10, 0, 0, 0), 10)],
+    'b.jsonl': [sessionMeta(t, 'segments'), tokenCount('2026-09-06T00:01:00.000Z', usage(10, 0, 0, 0), 20)],
+  });
+  try { await withCodexEnv(fixture, async () => {
+    const cold = await parse();
+    assert.equal(sumBuckets(cold.buckets).input, 20);
+    const warm = await parse();
+    assert.deepEqual(warm.buckets, cold.buckets);
+    assert.equal(warm.cache.filesRead, 0);
+    for (const [name, minute, total] of [['b', 2, 30], ['a', 3, 40]]) {
+      appendFileSync(join(fixture.dir, `${name}.jsonl`), JSON.stringify(tokenCount(`2026-09-06T00:0${minute}:00.000Z`, usage(10, 0, 0, 0), total)) + '\n');
+      const changed = await parse(); assert.equal(sumBuckets(changed.buckets).input, total);
+      assert.deepEqual((await parse()).buckets, changed.buckets);
+    }
+    const cached = await parse(); process.env.VIBE_USAGE_CODEX_CACHE = '0';
+    const uncached = await parse(); assert.deepEqual(uncached.buckets, cached.buckets); assert.deepEqual(uncached.sessions, cached.sessions);
+    delete process.env.VIBE_USAGE_CODEX_CACHE;
+    rmSync(join(fixture.dir, 'b.jsonl'));
+    assert.equal(sumBuckets((await parse()).buckets).input, 20);
+  }); } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+});
+
+test('conflicting same-ID copy order skips Codex instead of sending a partial result', async () => {
+  const t = '2026-09-06T00:00:00.000Z';
+  const a = tokenCount(t, usage(10, 0, 0, 0), 10), b = tokenCount(t, usage(10, 0, 0, 0), 20);
+  const result = await parseFixture({ 'a.jsonl': [sessionMeta(t, 'segments'), a, b], 'b.jsonl': [sessionMeta(t, 'segments'), b, a] });
+  assert.equal(result.skipped, true); assert.deepEqual(result.buckets, []); assert.ok(result.warnings.length);
+});
+
+
+test('a segmented session matches an unsplit transcript, including timing, without caching chat text', async () => {
+  const t = '2026-09-06T00:00:00.000Z';
+  const header = sessionMeta(t, 'segments');
+  const a = tokenCount('2026-09-06T00:01:00.000Z', usage(10, 3, 4, 1), 14);
+  const chat = { type: 'response_item', timestamp: '2026-09-06T00:02:00.000Z',
+    payload: { role: 'assistant', content: [{ text: 'PRIVATE_SEGMENT_CHAT_SENTINEL' }] } };
+  const b = tokenCount('2026-09-06T00:03:00.000Z', usage(20, 6, 8, 2), 42);
+  const expected = await parseFixture({ 'whole.jsonl': [header, a, chat, b] });
+  const fixture = createPersistentFixture({ 'a.jsonl': [header, a, chat], 'b.jsonl': [header, chat, b] });
+  const prevInterval = process.env.VIBE_USAGE_CODEX_AUDIT_INTERVAL_MS;
+  try {
+    await withCodexEnv(fixture, async () => {
+      const result = await parse();
+      assert.deepEqual(result.buckets, expected.buckets);
+      assert.deepEqual(result.sessions, expected.sessions);
+      const dir = codexCacheDir(fixture.root);
+      for (const name of readdirSync(dir)) {
+        assert.ok(!readFileSync(join(dir, name), 'utf8').includes('PRIVATE_SEGMENT_CHAT_SENTINEL'));
+      }
+      process.env.VIBE_USAGE_CODEX_AUDIT_INTERVAL_MS = '0';
+      const audited = await parse();
+      assert.deepEqual(audited.buckets, expected.buckets);
+      assert.deepEqual(audited.sessions, expected.sessions);
+      assert.equal(audited.cache.audited, 1);
+      assert.equal(audited.cache.filesRead, 2);
+    });
+  } finally {
+    if (prevInterval === undefined) delete process.env.VIBE_USAGE_CODEX_AUDIT_INTERVAL_MS;
+    else process.env.VIBE_USAGE_CODEX_AUDIT_INTERVAL_MS = prevInterval;
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+
+test('multi-rollout classification metadata survives segment merge without duplicating usage', async () => {
+  const t = '2026-09-06T00:00:00.000Z';
+  const firstUsage = usage(10, 0, 2, 0);
+  const secondUsage = usage(10, 0, 3, 0);
+  const first = [
+    sessionMeta(t, 'classified-segments'),
+    { type: 'turn_context', timestamp: t, payload: { model: 'test-model' } },
+    { type: 'response_item', timestamp: '2026-09-06T00:00:10.000Z', payload: {
+      type: 'message', role: 'assistant', phase: 'final', id: 'item-1', response_id: 'response-1',
+      internal_chat_message_metadata_passthrough: { turn_id: 'turn-1' },
+      content: [{ type: 'output_text', text: 'CLASSIFICATION_PRIVATE_TEXT' }],
+    } },
+    { type: 'token_usage_record', timestamp: '2026-09-06T00:00:11.000Z', payload: {
+      thread_id: 'classified-segments', turn_id: 'turn-1', response_id: 'response-1', usage: firstUsage,
+    } },
+    tokenCount('2026-09-06T00:00:12.000Z', firstUsage, 12),
+  ];
+  const second = [
+    ...first,
+    { type: 'turn_context', timestamp: '2026-09-06T00:01:00.000Z', payload: { model: 'test-model' } },
+    { type: 'response_item', timestamp: '2026-09-06T00:01:10.000Z', payload: {
+      type: 'function_call', role: 'assistant', phase: 'commentary', id: 'item-2', response_id: 'response-2',
+      internal_chat_message_metadata_passthrough: { turn_id: 'turn-2' },
+      name: 'private_tool_name', arguments: '{"private":"tool args"}',
+    } },
+    { type: 'token_usage_record', timestamp: '2026-09-06T00:01:11.000Z', payload: {
+      thread_id: 'classified-segments', turn_id: 'turn-2', response_id: 'response-2', usage: secondUsage,
+    } },
+    tokenCountInfo('2026-09-06T00:01:12.000Z', {
+      model: 'gpt-5.2', total_token_usage: usage(20, 0, 5, 0), last_token_usage: secondUsage,
+    }),
+  ];
+  const fixture = createPersistentFixture({ 'a.jsonl': first, 'b.jsonl': second });
+  try {
+    await withCodexEnv(fixture, async () => {
+      const result = await parse();
+      assert.equal(sumBuckets(result.buckets).input, 20);
+      assert.equal(sumBuckets(result.buckets).output, 5);
+      assert.equal(result.buckets.find(bucket => bucket.requestType === 'non_tool')?.inputTokens, 10);
+      assert.equal(result.buckets.find(bucket => bucket.requestType === 'tool')?.inputTokens, 10);
+      const cacheText = readdirSync(codexCacheDir(fixture.root))
+        .map(name => readFileSync(join(codexCacheDir(fixture.root), name), 'utf8')).join('\n');
+      assert.doesNotMatch(cacheText, /CLASSIFICATION_PRIVATE_TEXT|private_tool_name|private.*tool args/);
+    });
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('an unreadable continuation suppresses partial Codex uploads', {
+  skip: process.platform === 'win32' ? 'POSIX chmod fixture: Windows requires a separate ACL denial test'
+    : process.getuid?.() === 0 && 'POSIX root bypasses chmod denial; run as an unprivileged user',
+}, async () => {
+  const t = '2026-09-06T00:00:00.000Z';
+  const fixture = createPersistentFixture({
+    'a.jsonl': [sessionMeta(t, 'segments'), tokenCount(t, usage(10, 0, 0, 0), 10)],
+    'b.jsonl': [sessionMeta(t, 'segments'), tokenCount('2026-09-06T00:01:00.000Z', usage(10, 0, 0, 0), 20)],
+  });
+  const blocked = join(fixture.dir, 'b.jsonl');
+  try {
+    await withCodexEnv(fixture, async () => {
+      assert.equal(sumBuckets((await parse()).buckets).input, 20);
+      process.env.VIBE_USAGE_CODEX_CACHE = '0';
+      chmodSync(blocked, 0o000);
+      const failed = await parse();
+      assert.equal(failed.skipped, true);
+      assert.deepEqual(failed.buckets, []);
+      assert.deepEqual(failed.sessions, []);
+      assert.ok(failed.warnings.length);
+    });
+  } finally {
+    chmodSync(blocked, 0o600);
     rmSync(fixture.root, { recursive: true, force: true });
   }
 });

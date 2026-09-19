@@ -5,7 +5,13 @@ import { createHash } from 'node:crypto';
 import { toCsv } from './analytics.js';
 import { EXECUTION_COLUMNS } from './web/report-contracts.js';
 
-export const DETAIL_COLUMNS = ['date', 'source', 'model', 'project', 'hostname', 'requestType', 'bucketStart', 'inputTokens', 'cachedInputTokens', 'outputTokens', 'reasoningOutputTokens', 'totalTokens', 'allTokens', 'inputCost', 'cacheCost', 'outputCost', 'reasoningCost', 'estimatedCost'];
+export const DETAIL_COLUMNS = [
+  'date', 'source', 'model', 'project', 'hostname', 'requestType', 'bucketStart',
+  'inputTokens', 'cachedInputTokens', 'outputTokens', 'reasoningOutputTokens',
+  'cacheCreation5mTokens', 'cacheCreation1hTokens', 'totalTokens', 'allTokens',
+  'inputCost', 'cacheCost', 'outputCost', 'reasoningCost', 'cacheWrite5mCost',
+  'cacheWrite1hCost', 'estimatedCost',
+];
 export const SESSION_COLUMNS = ['source', 'project', 'hostname', 'sessionHash', 'firstMessageAt', 'lastMessageAt', 'durationSeconds', 'activeSeconds', 'messageCount', 'userMessageCount'];
 export { EXECUTION_COLUMNS };
 

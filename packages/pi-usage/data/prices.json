@@ -2,7 +2,7 @@
   "snapshotDate": "2026-09-05",
   "source": "https://models.dev/api.json",
   "sourceSha256": "1ec8a1ac5c776b36b3739cb00343a4a5f449044c88c0b7487a3745d824ddd2d2",
-  "note": "models.dev community-maintained snapshot, USD per million tokens; base text rates, not a billing invoice.",
+  "note": "models.dev community-maintained snapshot, USD per million tokens; Anthropic TTL and supported fast-mode aliases use the official pricing reference; base text rates are not a billing invoice.",
   "models": {
     "openai/gpt-5-nano": {
       "input": 0.05,
@@ -76,7 +76,8 @@
       "provider": "openai",
       "reference": "https://platform.openai.com/docs/models",
       "cacheWrite": 5,
-      "tiered": true
+      "tiered": true,
+      "cacheWrite5m": 5
     },
     "gpt-5.6-sol": {
       "input": 4,
@@ -86,7 +87,8 @@
       "provider": "openai",
       "reference": "https://platform.openai.com/docs/models",
       "cacheWrite": 5,
-      "tiered": true
+      "tiered": true,
+      "cacheWrite5m": 5
     },
     "openai/gpt-4o-2024-08-06": {
       "input": 2.5,
@@ -112,7 +114,8 @@
       "provider": "openai",
       "reference": "https://platform.openai.com/docs/models",
       "cacheWrite": 12.5,
-      "tiered": true
+      "tiered": true,
+      "cacheWrite5m": 12.5
     },
     "gpt-6-astra": {
       "input": 10,
@@ -122,7 +125,8 @@
       "provider": "openai",
       "reference": "https://platform.openai.com/docs/models",
       "cacheWrite": 12.5,
-      "tiered": true
+      "tiered": true,
+      "cacheWrite5m": 12.5
     },
     "openai/gpt-5.2-pro": {
       "input": 21,
@@ -262,7 +266,8 @@
       "provider": "openai",
       "reference": "https://platform.openai.com/docs/models",
       "cacheWrite": 0.25,
-      "tiered": true
+      "tiered": true,
+      "cacheWrite5m": 0.25
     },
     "gpt-5.6-luna": {
       "input": 0.2,
@@ -272,7 +277,8 @@
       "provider": "openai",
       "reference": "https://platform.openai.com/docs/models",
       "cacheWrite": 0.25,
-      "tiered": true
+      "tiered": true,
+      "cacheWrite5m": 0.25
     },
     "openai/gpt-5.3-codex": {
       "input": 1.75,
@@ -428,7 +434,8 @@
       "provider": "openai",
       "reference": "https://platform.openai.com/docs/models",
       "cacheWrite": 5,
-      "tiered": true
+      "tiered": true,
+      "cacheWrite5m": 5
     },
     "gpt-5.6": {
       "input": 4,
@@ -438,7 +445,8 @@
       "provider": "openai",
       "reference": "https://platform.openai.com/docs/models",
       "cacheWrite": 5,
-      "tiered": true
+      "tiered": true,
+      "cacheWrite5m": 5
     },
     "openai/text-embedding-3-small": {
       "input": 0.02,
@@ -514,7 +522,8 @@
       "provider": "openai",
       "reference": "https://platform.openai.com/docs/models",
       "cacheWrite": 2.5,
-      "tiered": true
+      "tiered": true,
+      "cacheWrite5m": 2.5
     },
     "gpt-5.6-terra": {
       "input": 2,
@@ -524,7 +533,8 @@
       "provider": "openai",
       "reference": "https://platform.openai.com/docs/models",
       "cacheWrite": 2.5,
-      "tiered": true
+      "tiered": true,
+      "cacheWrite5m": 2.5
     },
     "openai/gpt-4": {
       "input": 30,
@@ -711,7 +721,10 @@
       "reasoning": 15,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 3.75
+      "cacheWrite": 3.75,
+      "cacheWrite5m": 3.75,
+      "cacheWrite1h": 6,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "claude-sonnet-4-6": {
       "input": 3,
@@ -720,7 +733,10 @@
       "reasoning": 15,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 3.75
+      "cacheWrite": 3.75,
+      "cacheWrite5m": 3.75,
+      "cacheWrite1h": 6,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "anthropic/claude-opus-5": {
       "input": 5,
@@ -729,7 +745,10 @@
       "reasoning": 25,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 6.25
+      "cacheWrite": 6.25,
+      "cacheWrite5m": 6.25,
+      "cacheWrite1h": 10,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "claude-opus-5": {
       "input": 5,
@@ -738,7 +757,10 @@
       "reasoning": 25,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 6.25
+      "cacheWrite": 6.25,
+      "cacheWrite5m": 6.25,
+      "cacheWrite1h": 10,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "anthropic/claude-opus-4-5": {
       "input": 5,
@@ -747,7 +769,10 @@
       "reasoning": 25,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 6.25
+      "cacheWrite": 6.25,
+      "cacheWrite5m": 6.25,
+      "cacheWrite1h": 10,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "claude-opus-4-5": {
       "input": 5,
@@ -756,7 +781,10 @@
       "reasoning": 25,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 6.25
+      "cacheWrite": 6.25,
+      "cacheWrite5m": 6.25,
+      "cacheWrite1h": 10,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "anthropic/claude-fable-5-1": {
       "input": 10,
@@ -765,7 +793,10 @@
       "reasoning": 50,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 12.5
+      "cacheWrite": 12.5,
+      "cacheWrite5m": 12.5,
+      "cacheWrite1h": 20,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "claude-fable-5-1": {
       "input": 10,
@@ -774,7 +805,10 @@
       "reasoning": 50,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 12.5
+      "cacheWrite": 12.5,
+      "cacheWrite5m": 12.5,
+      "cacheWrite1h": 20,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "anthropic/claude-opus-4-6": {
       "input": 5,
@@ -783,7 +817,10 @@
       "reasoning": 25,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 6.25
+      "cacheWrite": 6.25,
+      "cacheWrite5m": 6.25,
+      "cacheWrite1h": 10,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "claude-opus-4-6": {
       "input": 5,
@@ -792,7 +829,10 @@
       "reasoning": 25,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 6.25
+      "cacheWrite": 6.25,
+      "cacheWrite5m": 6.25,
+      "cacheWrite1h": 10,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "anthropic/claude-sonnet-4-5-20250929": {
       "input": 3,
@@ -801,7 +841,10 @@
       "reasoning": 15,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 3.75
+      "cacheWrite": 3.75,
+      "cacheWrite5m": 3.75,
+      "cacheWrite1h": 6,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "claude-sonnet-4-5-20250929": {
       "input": 3,
@@ -810,7 +853,10 @@
       "reasoning": 15,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 3.75
+      "cacheWrite": 3.75,
+      "cacheWrite5m": 3.75,
+      "cacheWrite1h": 6,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "anthropic/claude-opus-4-7": {
       "input": 5,
@@ -819,7 +865,10 @@
       "reasoning": 25,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 6.25
+      "cacheWrite": 6.25,
+      "cacheWrite5m": 6.25,
+      "cacheWrite1h": 10,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "claude-opus-4-7": {
       "input": 5,
@@ -828,7 +877,10 @@
       "reasoning": 25,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 6.25
+      "cacheWrite": 6.25,
+      "cacheWrite5m": 6.25,
+      "cacheWrite1h": 10,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "anthropic/claude-haiku-4-5-20251001": {
       "input": 1,
@@ -837,7 +889,10 @@
       "reasoning": 5,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 1.25
+      "cacheWrite": 1.25,
+      "cacheWrite5m": 1.25,
+      "cacheWrite1h": 2,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "claude-haiku-4-5-20251001": {
       "input": 1,
@@ -846,7 +901,10 @@
       "reasoning": 5,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 1.25
+      "cacheWrite": 1.25,
+      "cacheWrite5m": 1.25,
+      "cacheWrite1h": 2,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "anthropic/claude-fable-5": {
       "input": 10,
@@ -855,7 +913,10 @@
       "reasoning": 50,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 12.5
+      "cacheWrite": 12.5,
+      "cacheWrite5m": 12.5,
+      "cacheWrite1h": 20,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "claude-fable-5": {
       "input": 10,
@@ -864,7 +925,10 @@
       "reasoning": 50,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 12.5
+      "cacheWrite": 12.5,
+      "cacheWrite5m": 12.5,
+      "cacheWrite1h": 20,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "anthropic/claude-haiku-4-5": {
       "input": 1,
@@ -873,7 +937,10 @@
       "reasoning": 5,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 1.25
+      "cacheWrite": 1.25,
+      "cacheWrite5m": 1.25,
+      "cacheWrite1h": 2,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "claude-haiku-4-5": {
       "input": 1,
@@ -882,7 +949,10 @@
       "reasoning": 5,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 1.25
+      "cacheWrite": 1.25,
+      "cacheWrite5m": 1.25,
+      "cacheWrite1h": 2,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "anthropic/claude-sonnet-4-5": {
       "input": 3,
@@ -891,7 +961,10 @@
       "reasoning": 15,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 3.75
+      "cacheWrite": 3.75,
+      "cacheWrite5m": 3.75,
+      "cacheWrite1h": 6,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "claude-sonnet-4-5": {
       "input": 3,
@@ -900,7 +973,10 @@
       "reasoning": 15,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 3.75
+      "cacheWrite": 3.75,
+      "cacheWrite5m": 3.75,
+      "cacheWrite1h": 6,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "anthropic/claude-opus-4-8": {
       "input": 5,
@@ -909,7 +985,10 @@
       "reasoning": 25,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 6.25
+      "cacheWrite": 6.25,
+      "cacheWrite5m": 6.25,
+      "cacheWrite1h": 10,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "claude-opus-4-8": {
       "input": 5,
@@ -918,7 +997,10 @@
       "reasoning": 25,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 6.25
+      "cacheWrite": 6.25,
+      "cacheWrite5m": 6.25,
+      "cacheWrite1h": 10,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "anthropic/claude-sonnet-5": {
       "input": 2,
@@ -927,7 +1009,10 @@
       "reasoning": 10,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 2.5
+      "cacheWrite": 2.5,
+      "cacheWrite5m": 2.5,
+      "cacheWrite1h": 4,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "claude-sonnet-5": {
       "input": 2,
@@ -936,7 +1021,10 @@
       "reasoning": 10,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 2.5
+      "cacheWrite": 2.5,
+      "cacheWrite5m": 2.5,
+      "cacheWrite1h": 4,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "anthropic/claude-opus-4-5-20251101": {
       "input": 5,
@@ -945,7 +1033,10 @@
       "reasoning": 25,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 6.25
+      "cacheWrite": 6.25,
+      "cacheWrite5m": 6.25,
+      "cacheWrite1h": 10,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "claude-opus-4-5-20251101": {
       "input": 5,
@@ -954,7 +1045,10 @@
       "reasoning": 25,
       "provider": "anthropic",
       "reference": "https://docs.anthropic.com/en/docs/about-claude/models",
-      "cacheWrite": 6.25
+      "cacheWrite": 6.25,
+      "cacheWrite5m": 6.25,
+      "cacheWrite1h": 10,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing"
     },
     "google/gemini-3.1-pro-preview-customtools": {
       "input": 2,
@@ -1467,7 +1561,8 @@
       "reasoning": 2.2,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "glm-4.7": {
       "input": 0.6,
@@ -1476,7 +1571,8 @@
       "reasoning": 2.2,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "zai/glm-4.5-air": {
       "input": 0.2,
@@ -1485,7 +1581,8 @@
       "reasoning": 1.1,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "glm-4.5-air": {
       "input": 0.2,
@@ -1494,7 +1591,8 @@
       "reasoning": 1.1,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "zai/glm-4.6": {
       "input": 0.6,
@@ -1503,7 +1601,8 @@
       "reasoning": 2.2,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "glm-4.6": {
       "input": 0.6,
@@ -1512,7 +1611,8 @@
       "reasoning": 2.2,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "zai/glm-4.6v": {
       "input": 0.3,
@@ -1537,7 +1637,8 @@
       "reasoning": 4.4,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "glm-5.2": {
       "input": 1.4,
@@ -1546,7 +1647,8 @@
       "reasoning": 4.4,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "zai/glm-4.5-flash": {
       "input": 0,
@@ -1555,7 +1657,8 @@
       "reasoning": 0,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "glm-4.5-flash": {
       "input": 0,
@@ -1564,7 +1667,8 @@
       "reasoning": 0,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "zai/glm-5.3-flash": {
       "input": 0.075,
@@ -1573,7 +1677,8 @@
       "reasoning": 0.25,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "glm-5.3-flash": {
       "input": 0.075,
@@ -1582,7 +1687,8 @@
       "reasoning": 0.25,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "zai/glm-4.5": {
       "input": 0.6,
@@ -1591,7 +1697,8 @@
       "reasoning": 2.2,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "glm-4.5": {
       "input": 0.6,
@@ -1600,7 +1707,8 @@
       "reasoning": 2.2,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "zai/glm-4.5v": {
       "input": 0.6,
@@ -1625,7 +1733,8 @@
       "reasoning": 0.4,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "glm-4.7-flashx": {
       "input": 0.07,
@@ -1634,7 +1743,8 @@
       "reasoning": 0.4,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "zai/glm-5": {
       "input": 1,
@@ -1643,7 +1753,8 @@
       "reasoning": 3.2,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "glm-5": {
       "input": 1,
@@ -1652,7 +1763,8 @@
       "reasoning": 3.2,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "zai/glm-5.1": {
       "input": 1.4,
@@ -1661,7 +1773,8 @@
       "reasoning": 4.4,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "glm-5.1": {
       "input": 1.4,
@@ -1670,7 +1783,8 @@
       "reasoning": 4.4,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "zai/glm-5-turbo": {
       "input": 1.2,
@@ -1679,7 +1793,8 @@
       "reasoning": 4,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "glm-5-turbo": {
       "input": 1.2,
@@ -1688,7 +1803,8 @@
       "reasoning": 4,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "zai/glm-5.3": {
       "input": 1.4,
@@ -1697,7 +1813,8 @@
       "reasoning": 4.4,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "glm-5.3": {
       "input": 1.4,
@@ -1706,7 +1823,8 @@
       "reasoning": 4.4,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "zai/glm-5v-turbo": {
       "input": 1.2,
@@ -1715,7 +1833,8 @@
       "reasoning": 4,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "glm-5v-turbo": {
       "input": 1.2,
@@ -1724,7 +1843,8 @@
       "reasoning": 4,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "zai/glm-4.7-flash": {
       "input": 0,
@@ -1733,7 +1853,8 @@
       "reasoning": 0,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "glm-4.7-flash": {
       "input": 0,
@@ -1742,7 +1863,8 @@
       "reasoning": 0,
       "provider": "zai",
       "reference": "https://docs.z.ai/guides/overview/pricing",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "minimax/MiniMax-M2": {
       "input": 0.3,
@@ -1767,7 +1889,8 @@
       "reasoning": 1.2,
       "provider": "minimax",
       "reference": "https://platform.minimax.io/docs/guides/quickstart",
-      "cacheWrite": 0.375
+      "cacheWrite": 0.375,
+      "cacheWrite5m": 0.375
     },
     "MiniMax-M2.1": {
       "input": 0.3,
@@ -1776,7 +1899,8 @@
       "reasoning": 1.2,
       "provider": "minimax",
       "reference": "https://platform.minimax.io/docs/guides/quickstart",
-      "cacheWrite": 0.375
+      "cacheWrite": 0.375,
+      "cacheWrite5m": 0.375
     },
     "minimax/MiniMax-M2.5": {
       "input": 0.3,
@@ -1785,7 +1909,8 @@
       "reasoning": 1.2,
       "provider": "minimax",
       "reference": "https://platform.minimax.io/docs/guides/quickstart",
-      "cacheWrite": 0.375
+      "cacheWrite": 0.375,
+      "cacheWrite5m": 0.375
     },
     "MiniMax-M2.5": {
       "input": 0.3,
@@ -1794,7 +1919,8 @@
       "reasoning": 1.2,
       "provider": "minimax",
       "reference": "https://platform.minimax.io/docs/guides/quickstart",
-      "cacheWrite": 0.375
+      "cacheWrite": 0.375,
+      "cacheWrite5m": 0.375
     },
     "minimax/MiniMax-M2.5-highspeed": {
       "input": 0.6,
@@ -1803,7 +1929,8 @@
       "reasoning": 2.4,
       "provider": "minimax",
       "reference": "https://platform.minimax.io/docs/guides/quickstart",
-      "cacheWrite": 0.375
+      "cacheWrite": 0.375,
+      "cacheWrite5m": 0.375
     },
     "MiniMax-M2.5-highspeed": {
       "input": 0.6,
@@ -1812,7 +1939,8 @@
       "reasoning": 2.4,
       "provider": "minimax",
       "reference": "https://platform.minimax.io/docs/guides/quickstart",
-      "cacheWrite": 0.375
+      "cacheWrite": 0.375,
+      "cacheWrite5m": 0.375
     },
     "minimax/MiniMax-M3": {
       "input": 0.3,
@@ -1839,7 +1967,8 @@
       "reasoning": 2.4,
       "provider": "minimax",
       "reference": "https://platform.minimax.io/docs/guides/quickstart",
-      "cacheWrite": 0.375
+      "cacheWrite": 0.375,
+      "cacheWrite5m": 0.375
     },
     "MiniMax-M2.7-highspeed": {
       "input": 0.6,
@@ -1848,7 +1977,8 @@
       "reasoning": 2.4,
       "provider": "minimax",
       "reference": "https://platform.minimax.io/docs/guides/quickstart",
-      "cacheWrite": 0.375
+      "cacheWrite": 0.375,
+      "cacheWrite5m": 0.375
     },
     "minimax/MiniMax-M2.7": {
       "input": 0.3,
@@ -1857,7 +1987,8 @@
       "reasoning": 1.2,
       "provider": "minimax",
       "reference": "https://platform.minimax.io/docs/guides/quickstart",
-      "cacheWrite": 0.375
+      "cacheWrite": 0.375,
+      "cacheWrite5m": 0.375
     },
     "MiniMax-M2.7": {
       "input": 0.3,
@@ -1866,7 +1997,8 @@
       "reasoning": 1.2,
       "provider": "minimax",
       "reference": "https://platform.minimax.io/docs/guides/quickstart",
-      "cacheWrite": 0.375
+      "cacheWrite": 0.375,
+      "cacheWrite5m": 0.375
     },
     "xai/grok-4.3": {
       "input": 1.25,
@@ -2609,7 +2741,8 @@
       "reasoning": 0,
       "provider": "kimi-for-coding",
       "reference": "https://www.kimi.com/code/docs/en/kimi-code/models.html",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "kimi-for-coding-highspeed": {
       "input": 0,
@@ -2618,7 +2751,8 @@
       "reasoning": 0,
       "provider": "kimi-for-coding",
       "reference": "https://www.kimi.com/code/docs/en/kimi-code/models.html",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "kimi-for-coding/k3-256k": {
       "input": 0,
@@ -2627,7 +2761,8 @@
       "reasoning": 0,
       "provider": "kimi-for-coding",
       "reference": "https://www.kimi.com/code/docs/en/kimi-code/models.html",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "k3-256k": {
       "input": 0,
@@ -2636,7 +2771,8 @@
       "reasoning": 0,
       "provider": "kimi-for-coding",
       "reference": "https://www.kimi.com/code/docs/en/kimi-code/models.html",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "kimi-for-coding/kimi-for-coding": {
       "input": 0,
@@ -2645,7 +2781,8 @@
       "reasoning": 0,
       "provider": "kimi-for-coding",
       "reference": "https://www.kimi.com/code/docs/en/kimi-code/models.html",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "kimi-for-coding": {
       "input": 0,
@@ -2654,7 +2791,8 @@
       "reasoning": 0,
       "provider": "kimi-for-coding",
       "reference": "https://www.kimi.com/code/docs/en/kimi-code/models.html",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "kimi-for-coding/k3": {
       "input": 0,
@@ -2663,7 +2801,8 @@
       "reasoning": 0,
       "provider": "kimi-for-coding",
       "reference": "https://www.kimi.com/code/docs/en/kimi-code/models.html",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
     },
     "k3": {
       "input": 0,
@@ -2672,7 +2811,65 @@
       "reasoning": 0,
       "provider": "kimi-for-coding",
       "reference": "https://www.kimi.com/code/docs/en/kimi-code/models.html",
-      "cacheWrite": 0
+      "cacheWrite": 0,
+      "cacheWrite5m": 0
+    },
+    "claude-opus-5-fast": {
+      "input": 10,
+      "output": 50,
+      "cacheRead": 1,
+      "reasoning": 50,
+      "provider": "anthropic",
+      "reference": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "cacheWrite": 12.5,
+      "cacheWrite5m": 12.5,
+      "cacheWrite1h": 20,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "pricingSource": "Anthropic fast mode rates verified 2026-09-19"
+    },
+    "anthropic/claude-opus-5-fast": {
+      "input": 10,
+      "output": 50,
+      "cacheRead": 1,
+      "reasoning": 50,
+      "provider": "anthropic",
+      "reference": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "cacheWrite": 12.5,
+      "cacheWrite5m": 12.5,
+      "cacheWrite1h": 20,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "pricingSource": "Anthropic fast mode rates verified 2026-09-19"
+    },
+    "claude-opus-4-8-fast": {
+      "input": 10,
+      "output": 50,
+      "cacheRead": 1,
+      "reasoning": 50,
+      "provider": "anthropic",
+      "reference": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "cacheWrite": 12.5,
+      "cacheWrite5m": 12.5,
+      "cacheWrite1h": 20,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "pricingSource": "Anthropic fast mode rates verified 2026-09-19"
+    },
+    "anthropic/claude-opus-4-8-fast": {
+      "input": 10,
+      "output": 50,
+      "cacheRead": 1,
+      "reasoning": 50,
+      "provider": "anthropic",
+      "reference": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "cacheWrite": 12.5,
+      "cacheWrite5m": 12.5,
+      "cacheWrite1h": 20,
+      "cacheWriteReference": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "pricingSource": "Anthropic fast mode rates verified 2026-09-19"
     }
+  },
+  "supplementalPricing": {
+    "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+    "verifiedDate": "2026-09-19",
+    "note": "Official Anthropic 5m/1h cache-write multipliers and the two supported fast-mode aliases are supplemental to the models.dev snapshot."
   }
 }

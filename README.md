@@ -83,7 +83,7 @@ npx skills add geoqiao/pi-tools --skill paseo-btw --agent '*' -g
 [![npm downloads](https://img.shields.io/npm/dm/@geoqiao/pi-usage)](https://www.npmjs.com/package/@geoqiao/pi-usage)
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A5%2022.15-417e38)](https://nodejs.org/)
 
-See where your AI coding tokens and estimated costs go. Analyze 28 data sources locally and
+See where your AI coding tokens and estimated costs go. Analyze 33 data sources locally and
 open a self-contained HTML dashboard—no account, background service, or web server required.
 Source retrieval may use the network; collected usage is never uploaded. Costs are estimates,
 not actual bills.

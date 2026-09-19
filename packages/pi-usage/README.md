@@ -6,7 +6,7 @@
 
 **这段时间用了多少 Token，主要用在哪？把 AI 编程工具的使用记录，变成一份本地交互报告。**
 
-`@geoqiao/pi-usage` 支持 Pi、Claude Code、Codex 等 **28 类数据源**，在本机完成计价和分析，生成可离线打开的 HTML 看板，并导出 CSV / JSON。无需额外注册账号，无后台服务、LLM 分析调用或运行时 npm 依赖；**不上传统计数据**。
+`@geoqiao/pi-usage` 支持 Pi、Claude Code、Codex 等 **33 类数据源**，在本机完成计价和分析，生成可离线打开的 HTML 看板，并导出 CSV / JSON。无需额外注册账号，无后台服务、LLM 分析调用或运行时 npm 依赖；**不上传统计数据**。
 
 ![Pi Usage 看板：日期与多维筛选、Token 构成、每日趋势、请求构成、用量排名和典型一天](https://raw.githubusercontent.com/geoqiao/pi-tools/main/packages/pi-usage/docs/media/pi-usage-dashboard.png)
 
@@ -66,7 +66,7 @@ npx @geoqiao/pi-usage --days 90
 
 **日期按钮筛选的是已有快照，不会重新采集。** 7D / 30D / 90D 均以报告截止日为锚点并包含该日；范围不足的按钮不可用，不再静默裁剪。“全部”仅指这份报告已有日期。要扩大范围，请重新运行 `/usage-report 90` 或 CLI 的 `--days` 参数。
 
-**采集范围与当前筛选分开显示。** 默认命令尝试读取全部 28 个来源，但不代表每个来源都有记录或都读取完整；`--sources` 生成的是指定来源快照。清除页面筛选不能补回未采集来源，需不带 `--sources` 重新生成。`--offline` 仍限制 Cursor / Antigravity；来源状态保留失败、部分读取和无记录提示。旧报告未记录采集范围时只展示已知来源，不冒充全来源。
+**采集范围与当前筛选分开显示。** 默认命令尝试读取全部 33 个来源，但不代表每个来源都有记录或都读取完整；`--sources` 生成的是指定来源快照。清除页面筛选不能补回未采集来源，需不带 `--sources` 重新生成。`--offline` 仍限制 Cursor / Antigravity；来源状态保留失败、部分读取和无记录提示。旧报告未记录采集范围时只展示已知来源，不冒充全来源。
 
 **先看 Token，再看金额。** 请求构成图按含缓存 Token 占比展示，不是请求次数；会话时长不作为工时或生产力指标展示。
 
@@ -91,7 +91,7 @@ Harness 对应数据中的 `source` 字段，表示工具来源，不表示一�
 | Kimi Code | 新格式匹配 step UUID / turn / usage；旧格式匹配 StepBegin / StepRetry 至完整 token usage | 缺边界、usage 不匹配、中断、无法关联的 session scope / 压缩账本；不混入子代理事件 |
 | 其他来源 | 尚未建立可靠请求级关联 | 保留 `other`，不猜测 |
 
-Codex 的 `token_usage_record` 仅用于核对完成证据，不叠加到 `token_count` 计量，也不把整个 turn 当作一次请求。分类补全不改变四类 Token、去重或价格口径；旧解析缓存会自动失效。
+Codex 的 `token_usage_record` 仅用于核对完成证据，不叠加到 `token_count` 计量，也不把整个 turn 当作一次请求。分类补全不改变 Token 计量、去重或价格口径；旧解析缓存会自动失效。同会话续写产生的多个 rollout 按上游分段规则计量。
 
 导入旧 JSON 时，缺失的 `requestType` 默认归其他。更新 HTML 无法恢复旧汇总中丢失的信息，需要重新读取日志。完整证据与本地补丁见 [parser attribution](vendor/vibe-usage/NOTICE.md)。
 
@@ -191,7 +191,7 @@ npx @geoqiao/pi-usage --days 30 --timezone Asia/Shanghai \
 |---|---|
 | `--days 90` | 包含今天的日历日数量，范围 1–3660；默认 90 |
 | `--timezone Asia/Shanghai` | 日期分组时区；默认系统 IANA 时区 |
-| `--sources pi-coding-agent,codex` | 只读取指定来源；默认全部 28 类 |
+| `--sources pi-coding-agent,codex` | 只读取指定来源；默认全部 33 类 |
 | `--out /path/to/empty-directory` | 指定输出目录；非空目录会被拒绝，避免覆盖 |
 | `--offline` | 禁止来源网络请求；Cursor 不可用，Antigravity 仅解析本地 DB |
 | `--input /path/to/usage.json` | 从已有桶、会话及可选 execution 重新分析，不读取数据源 |
@@ -205,6 +205,17 @@ npx @geoqiao/pi-usage --input /path/to/usage.json --days 90 --offline
 ```
 
 `--input` 接受 `{ "buckets": [...], "sessions": [...], "execution": [...] }`，忽略原有费用，按当前本地价格重新计算。新导出为 `schemaVersion: 2`；旧文件缺少 `execution` 时按空数组兼容，不能凭旧桶恢复执行证据。execution 只保留白名单统计字段与哈希标识，验证计数守恒与缺失值；聚合计数字段必须完整提供，不把缺字段补成零。其他字段不会保留，也不会自动沿用外部 CSV 的疑似重复标记。来源完整性未验证，日期窗口仍以本次执行日为截止日。
+
+## 订阅配额
+
+订阅剩余额度通过独立的显式 CLI 命令读取，不进入 HTML / CSV / usage.json：
+
+```bash
+npx @geoqiao/pi-usage quota discover --json
+npx @geoqiao/pi-usage quota fetch --product kimi-code --json
+```
+
+支持 Kimi Code、ZCode（BigModel / Z.ai）与 Grok；Cursor 仅可发现。认证、离线模式与缓存说明见 [订阅配额指南](docs/quotas.md)。正常生成报告不会触发配额查询。
 
 ## 报告与导出
 
@@ -224,19 +235,20 @@ CSV 使用 UTF-8 BOM、标准引号转义与公式注入防护，可在 Excel �
 
 ## 数据源与隐私
 
-保留 [Vibe Usage](https://github.com/vibe-cafe/vibe-usage) **0.10.21 的全部 28 个 parser**。本包独立维护，不是 VibeCafé 官方产品。
+保留 [Vibe Usage](https://github.com/vibe-cafe/vibe-usage) **0.11.1 的全部 33 类数据源**，固定上游提交 `4a4dcc09f1510c7c732525a9e736068c60ff2a36`。本包独立维护，不是 VibeCafé 官方产品。
 
 | 来源类型 | 支持工具 |
 |---|---|
-| CLI / 会话日志 | Claude Code、Codex、Grok、Copilot CLI、CraftAgent、Gemini CLI、OpenClaw、Oh My Pi、Pi、Qwen Code、Kimi Code、Amp、Droid、DeepSeek Harness、Trae CLI、WorkBuddy |
-| 本地 DB / 编辑器存储 | Alma、DimAgent、OpenCode、Hermes、Kiro、MiniMax Code、MiMoCode、Cline、Roo Code、ZCode |
+| CLI / 会话日志 | Claude Code、Codex、Cola、CodeBuddy、Grok、Copilot CLI、CraftAgent、Gemini CLI、OpenClaw、Oh My Pi、Pi、Qwen Code、Kimi Code / Kimi Work、Amp、Droid、DeepSeek Harness、Trae CLI、WorkBuddy |
+| 本地 DB / 编辑器存储 | Alma、DimAgent、OpenCode、Hermes、Kiro、MiniMax Code、MiMoCode、Cline CLI / SDK / Desktop、Roo Code、ZCode、Qoder / Qoder CN、Devin CLI / Desktop |
 | 来源服务读取 | Cursor：用本机已有登录凭据从 cursor.com 下载明细；Antigravity：本地 DB，旧版加密历史可通过 127.0.0.1 只读 RPC 获取 |
 
 **允许从来源获取数据，不允许上传采集结果。**
 
 | 边界 | 行为 |
 |---|---|
-| 网络读取 | 仅允许 Cursor 固定 GET 导出地址和 Antigravity 本机两种读取 RPC；拒绝重定向与自定义 Cursor 服务地址 |
+| 用量网络读取 | 仅允许 Cursor 固定 GET 导出地址和 Antigravity 本机两种读取 RPC；拒绝重定向与自定义 Cursor 服务地址 |
+| 配额网络读取 | 仅在显式执行 `quota fetch` 时查询支持的官方配额端点；认证与离线行为见配额指南，不发送采集的用量 |
 | 统计与日志 | 不向 VibeCafé、模型服务或遥测服务发送统计、项目名或消息正文；来源请求只携带认证所需的已有凭据 |
 | 生成报告 | 只保存白名单统计字段，不保存 prompt / 回复 / 代码正文；解析器仅在本机读取日志提取用量 |
 | HTML | 自包含，CSP 禁止连接、远程资源、表单和嵌入对象；脚本以 SHA-256 授权，无 CDN、远程字体或追踪像素 |
@@ -263,21 +275,21 @@ Cindy 本地账本归并到 Codex / Pi，不新增独立来源。Codex 使用可
 
 **费用是估算，不是账单；分位描述历史样本，不预测未来。**
 
-随包提供 **2026-09-05 [models.dev](https://models.dev) 社区价格快照**：159 个基础模型、318 个精确标识（含 provider 前缀）。只取直接提供方的基础文本费率，保留来源 URL、日期与内容 SHA-256；不是从聊天费用拟合，也不声称逐条验证过厂商官网。运行时不会自动下载或更新价格。
+随包提供 **2026-09-05 [models.dev](https://models.dev) 社区价格快照**：159 个基础模型，加上 Claude Opus 5 / Opus 4.8 的 Fast 档，共 322 个精确标识（含 provider 前缀）。基础文本费率取直接提供方，保留来源 URL、日期与内容 SHA-256；不是从聊天费用拟合，也不声称逐条验证过厂商官网。另按 **2026-09-19 [Anthropic 官方价格](https://platform.claude.com/docs/en/about-claude/pricing)** 补充 Claude 缓存写入 TTL 费率及上述两个 Fast 档，并单独记录补充来源与核对日期。运行时不会自动下载或更新价格。
 
 | 注意项 | 处理方式 / 限制 |
 |---|---|
 | 未定价或缺费率 | 金额为 `null`，不是零；部分定价显示已知小计与可计价 Token 比例，不将其视为真实费用覆盖率 |
-| 缓存写入与长上下文 | 缓存写入已并入输入，无法恢复其独立溢价；缺少逐请求上下文长度，无法重建阶梯价 |
+| 缓存写入与长上下文 | Claude Code 的缓存写入按 5 分钟 / 1 小时拆分；其他未拆分来源与旧报告仍可能并入输入，无法恢复其独立溢价。缺少逐请求上下文长度，无法重建阶梯价 |
 | 实际账单 | 不含媒体计费、税费、批量折扣、订阅扣款或赠送额度；快照费率用于全部历史日期 |
 | 分位样本 | 默认仅包含有用量日；「将无记录日按 0 纳入」是显式假设，不代表确认当天未使用 |
 | 金额分位 | 与 Token 分位分开；完整日金额标明有效 / 排除样本，已知金额小计不能冒充完整金额 |
-| 模型计价 | 按每天的四类 Token 重新计价，再取分位和极值；不把各类 Token 的分位乘价后相加，不推断节省、质量或生产力 |
+| 模型计价 | 按每天的六类 Token（含两类缓存写入）重新计价，再取分位和极值；不把各类 Token 的分位乘价后相加，不推断节省、质量或生产力 |
 
 <details>
 <summary>本地费率覆盖与计算公式</summary>
 
-用 `--prices` 指定本地 JSON。**每个覆盖项必须完整提供四项费率**，单位为美元 / 百万 Token：
+用 `--prices` 指定本地 JSON。**每个覆盖项必须完整提供四项基础费率**，有缓存写入时另提供对应 TTL 费率，单位为美元 / 百万 Token：
 
 ```json
 {
@@ -285,6 +297,8 @@ Cindy 本地账本归并到 Codex / Pi，不新增独立来源。Codex 使用可
     "my-model": {
       "input": 5,
       "cacheRead": 0.5,
+      "cacheWrite5m": 6.25,
+      "cacheWrite1h": 10,
       "output": 30,
       "reasoning": 30
     }
@@ -294,9 +308,13 @@ Cindy 本地账本归并到 Codex / Pi，不新增独立来源。Codex 使用可
 
 允许非负有限数字；`cacheRead: null` 表示缓存费率未知，遇到缓存用量时该桶不计价。按完整模型标识匹配，允许唯一的大小写差异；不会随意删除 `#service_tier=...` 后缀或猜测别名，特殊档位需按其完整标识覆盖。
 
+`cacheWrite5m` / `cacheWrite1h` 为可选费率；5 分钟费率未提供时可使用已有 `cacheWrite`，1 小时费率不会由通用输入价猜测。存在对应写入 Token 却缺费率时，该桶金额为 `null`。上游 Claude 解析器把 TTL 明细未覆盖的写入余量计入较便宜的 5 分钟类别；旧报告缺少两类写入字段时补零，原输入计数保持不变。Fast mode 保留完整 `-fast` 模型标识，不退回标准费率。
+
 ```text
 estimatedCost = (inputTokens × input
                + cachedInputTokens × cacheRead
+               + cacheCreation5mTokens × cacheWrite5m
+               + cacheCreation1hTokens × cacheWrite1h
                + outputTokens × output
                + reasoningOutputTokens × reasoning) / 1,000,000
 ```

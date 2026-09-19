@@ -37,7 +37,7 @@ export default async function checkReport(page, { data, shortData, legacyData, s
   check(await page.locator('#overview .overview-section').nth(0).textContent().then(text => text.includes('整体用量') && text.includes('每日趋势')), 'Overview section one is unclear');
   check(await page.locator('#overview .overview-section').nth(1).textContent().then(text => text.includes('Harness') && text.includes('Tool-call') && text.includes('模型') && text.includes('典型一天')), 'Overview section two is incomplete');
   check(await page.locator('#overview .overview-section').nth(2).textContent().then(text => text.includes('Code Mode 成本影响')), 'Overview section three is missing');
-  check(await page.locator('#composition .token-part').count() === 4, 'Four token classes missing');
+  check(await page.locator('#composition .token-part').count() === 6, 'Six token classes missing');
   check((await page.locator('#total-value').textContent()).includes('M') && (await page.locator('#net-value').textContent()).includes('M'), 'Top Token values are not in M');
   check((await page.locator('.token-part strong').allTextContents()).every(text => text.includes('M')), 'Top Token composition is not in M');
 
@@ -86,12 +86,18 @@ export default async function checkReport(page, { data, shortData, legacyData, s
   const csvCheck = await page.evaluate(async source => {
     const text = await window.__qaCsv.text();
     const cells = [...text.matchAll(/"((?:[^"]|"")*)"(?=,|\r\n|$)/g)].map(match => match[1].replaceAll('""', '"'));
-    const headers = cells.slice(0, 15), rows = [];
-    for (let index = 15; index < cells.length; index += 15) rows.push(cells.slice(index, index + 15));
+    const columnCount = [...text.split('\r\n')[0].matchAll(/"((?:[^"]|"")*)"/g)].length;
+    const headers = cells.slice(0, columnCount), rows = [];
+    for (let index = columnCount; index < cells.length; index += columnCount) rows.push(cells.slice(index, index + columnCount));
     const allIndex = headers.indexOf('allTokens');
-    return { headers, rows, rawTotal: rows.reduce((n, row) => n + Number(row[allIndex]), 0), expected: source.buckets.reduce((n, row) => n + row.allTokens, 0), firstRaw: rows[0]?.[allIndex] };
+    const cacheWrites = ['cacheCreation5mTokens', 'cacheCreation1hTokens'].map(field => ({
+      field, actual: rows.reduce((n, row) => n + Number(row[headers.indexOf(field)]), 0),
+      expected: source.buckets.reduce((n, row) => n + (row[field] ?? 0), 0),
+    }));
+    return { headers, rows, cacheWrites, rawTotal: rows.reduce((n, row) => n + Number(row[allIndex]), 0), expected: source.buckets.reduce((n, row) => n + row.allTokens, 0), firstRaw: rows[0]?.[allIndex] };
   }, data);
-  check(csvCheck.headers.length === 15 && csvCheck.rawTotal === csvCheck.expected && /^\d+$/.test(csvCheck.firstRaw), 'CSV token values were formatted for display');
+  check(csvCheck.headers.includes('allTokens') && csvCheck.rawTotal === csvCheck.expected && /^\d+$/.test(csvCheck.firstRaw), 'CSV token values were formatted for display');
+  check(csvCheck.cacheWrites.every(row => row.expected > 0 && row.actual === row.expected), 'CSV lost cache-write TTL usage');
 
   await view('percentiles');
   check(!(await page.locator('#token-quantile-details').getAttribute('open')), 'Full Token details should start collapsed');
@@ -105,7 +111,7 @@ export default async function checkReport(page, { data, shortData, legacyData, s
   check(distributionHeight.difference < 180, 'Daily distribution cards still have a large equal-height blank area');
   await page.locator('#token-quantile-details summary').click();
   await page.locator('#quantiles tbody tr').first().waitFor({ state: 'attached' });
-  check(await page.locator('#quantiles tbody tr').count() === 6 && (await page.locator('#quantiles').textContent()).includes('M'), 'Collapsed full six-metric Token table missing or not in M');
+  check(await page.locator('#quantiles tbody tr').count() === 8 && (await page.locator('#quantiles').textContent()).includes('M'), 'Collapsed full eight-metric Token table missing or not in M');
   check((await page.locator('#quantiles th').allTextContents()).some(text => text.includes('M')), 'Token percentile headings do not declare M');
   await page.locator('#token-quantile-details summary').click();
   check((await page.locator('#daily-table').textContent()).includes('M'), 'Daily drilldown Token values are not in M');
