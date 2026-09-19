@@ -1,6 +1,15 @@
 // Shared by Node and the self-contained report. No filesystem or network access.
 import { normalizeExecutionRows } from './execution.js';
-export const TOKEN_FIELDS = ['inputTokens', 'cachedInputTokens', 'outputTokens', 'reasoningOutputTokens'];
+export const TOKEN_FIELDS = [
+  'inputTokens',
+  'cachedInputTokens',
+  'outputTokens',
+  'reasoningOutputTokens',
+  'cacheCreation5mTokens',
+  'cacheCreation1hTokens',
+];
+export const CACHE_WRITE_TOKEN_FIELDS = ['cacheCreation5mTokens', 'cacheCreation1hTokens'];
+export const COST_FIELDS = ['inputCost', 'cacheCost', 'outputCost', 'reasoningCost', 'cacheWrite5mCost', 'cacheWrite1hCost'];
 export const DIMENSIONS = ['source', 'model', 'project', 'hostname', 'requestType'];
 export const REQUEST_TYPES = { non_tool: '非工具调用请求', tool: '含工具调用请求', other: '其他（无法判定）' };
 export const QUANTILES = [0.25, 0.5, 0.75, 0.9];
@@ -64,24 +73,42 @@ export function validatePrices(models) {
       if (key === 'cacheRead' && rate[key] === null) continue;
       if (typeof rate[key] !== 'number' || !Number.isFinite(rate[key]) || rate[key] < 0) throw new Error(`${id}.${key} 必须是非负有限数值（美元 / 百万 token）`);
     }
+    for (const key of ['cacheWrite', 'cacheWrite5m', 'cacheWrite1h']) {
+      if (!Object.hasOwn(rate, key) || rate[key] === null) continue;
+      if (typeof rate[key] !== 'number' || !Number.isFinite(rate[key]) || rate[key] < 0) throw new Error(`${id}.${key} 必须是非负有限数值（美元 / 百万 token）`);
+    }
   }
   return models;
 }
 
-export function findRate(model, models) {
+export function findRate(model, models = {}) {
   // Whole identifiers only: never discard service-tier suffixes or match by substring.
   if (Object.hasOwn(models, model)) return models[model];
   const matches = Object.keys(models).filter(id => id.toLowerCase() === model.toLowerCase());
   return matches.length === 1 ? models[matches[0]] : null;
 }
 
+function cacheWriteRate(rate, ttl) {
+  if (ttl === '5m') return Object.hasOwn(rate, 'cacheWrite5m') ? rate.cacheWrite5m : rate.cacheWrite;
+  return rate.cacheWrite1h;
+}
+
 export function priceTokens(row, rate) {
-  if (!rate || (row.cachedInputTokens > 0 && rate.cacheRead == null)) return null;
+  const cacheCreation5mTokens = row.cacheCreation5mTokens ?? 0;
+  const cacheCreation1hTokens = row.cacheCreation1hTokens ?? 0;
+  const cacheWrite5m = rate && cacheWriteRate(rate, '5m');
+  const cacheWrite1h = rate && cacheWriteRate(rate, '1h');
+  if (!rate
+    || (row.cachedInputTokens > 0 && rate.cacheRead == null)
+    || (cacheCreation5mTokens > 0 && cacheWrite5m == null)
+    || (cacheCreation1hTokens > 0 && cacheWrite1h == null)) return null;
   const costs = {
     inputCost: row.inputTokens * rate.input / 1e6,
     cacheCost: row.cachedInputTokens * (rate.cacheRead ?? 0) / 1e6,
     outputCost: row.outputTokens * rate.output / 1e6,
     reasoningCost: row.reasoningOutputTokens * rate.reasoning / 1e6,
+    cacheWrite5mCost: cacheCreation5mTokens * (cacheWrite5m ?? 0) / 1e6,
+    cacheWrite1hCost: cacheCreation1hTokens * (cacheWrite1h ?? 0) / 1e6,
   };
   return { ...costs, estimatedCost: Object.values(costs).reduce((a, b) => a + b, 0) };
 }
@@ -98,7 +125,7 @@ function iso(value) {
   return new Date(value).toISOString();
 }
 
-export function normalizeData(raw, { timeZone, hostname = 'unknown', prices }) {
+export function normalizeData(raw, { timeZone, hostname = 'unknown', prices = {} }) {
   if (!Array.isArray(raw?.buckets) || !Array.isArray(raw?.sessions)) throw new Error('输入需要 buckets 和 sessions 数组');
   // Allow-list fields: no prompts, message bodies, credentials or arbitrary parser payloads in exports.
   const buckets = raw.buckets.map(row => {
@@ -108,10 +135,19 @@ export function normalizeData(raw, { timeZone, hostname = 'unknown', prices }) {
     b.bucketStart = iso(row.bucketStart);
     b.date = dateKey(b.bucketStart, timeZone);
     for (const k of TOKEN_FIELDS) b[k] = count(row[k] ?? 0);
-    b.totalTokens = count(b.inputTokens + b.outputTokens + b.reasoningOutputTokens);
+    b.totalTokens = count(b.inputTokens + b.outputTokens + b.reasoningOutputTokens
+      + b.cacheCreation5mTokens + b.cacheCreation1hTokens);
     b.allTokens = count(b.totalTokens + b.cachedInputTokens);
     const priced = priceTokens(b, findRate(b.model, prices));
-    return { ...b, ...(priced || { inputCost: null, cacheCost: null, outputCost: null, reasoningCost: null, estimatedCost: null }) };
+    return { ...b, ...(priced || {
+      inputCost: null,
+      cacheCost: null,
+      outputCost: null,
+      reasoningCost: null,
+      cacheWrite5mCost: null,
+      cacheWrite1hCost: null,
+      estimatedCost: null,
+    }) };
   });
   const sessions = raw.sessions.map(row => {
     const s = Object.fromEntries(['source', 'project', 'hostname'].map(k => [k, text(row[k], k === 'hostname' ? hostname : 'unknown')]));
@@ -127,15 +163,15 @@ export function normalizeData(raw, { timeZone, hostname = 'unknown', prices }) {
 }
 
 export function summarize(rows) {
-  const out = Object.fromEntries([...TOKEN_FIELDS, 'totalTokens', 'allTokens', 'knownCost', 'pricedTokens', 'inputCost', 'cacheCost', 'outputCost', 'reasoningCost'].map(k => [k, 0]));
+  const out = Object.fromEntries([...TOKEN_FIELDS, 'totalTokens', 'allTokens', 'knownCost', 'pricedTokens', ...COST_FIELDS].map(k => [k, 0]));
   out.unpricedRows = 0;
   for (const row of rows) {
-    for (const k of [...TOKEN_FIELDS, 'totalTokens', 'allTokens']) out[k] += row[k];
+    for (const k of [...TOKEN_FIELDS, 'totalTokens', 'allTokens']) out[k] += row[k] ?? 0;
     if (row.estimatedCost == null && row.allTokens > 0) out.unpricedRows++;
     else {
       out.knownCost += row.estimatedCost || 0;
       out.pricedTokens += row.allTokens;
-      for (const k of ['inputCost', 'cacheCost', 'outputCost', 'reasoningCost']) out[k] += row[k] || 0;
+      for (const k of COST_FIELDS) out[k] += row[k] || 0;
     }
   }
   out.estimatedCost = out.unpricedRows ? null : out.knownCost;
@@ -189,7 +225,7 @@ export function percentileRows(days) {
   });
 }
 
-export function simulateModels(days, modelIds, prices) {
+export function simulateModels(days, modelIds, prices = {}) {
   return [...new Set(modelIds)].sort().map(model => {
     const rate = findRate(model, prices);
     const repriced = days.map(day => priceTokens(day, rate)?.estimatedCost ?? null);

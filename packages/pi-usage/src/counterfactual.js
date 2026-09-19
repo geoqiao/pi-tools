@@ -11,12 +11,22 @@ function cfTokens(value) {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error('情景 Token 数超出安全范围');
   return value;
 }
-function cfRate(model, prices, cachedTokens) {
-  const rate = findRate(model,prices);
+function cfCacheWriteRate(rate, ttl) {
+  if (ttl === '5m') return Object.hasOwn(rate, 'cacheWrite5m') ? rate.cacheWrite5m : rate.cacheWrite;
+  return rate.cacheWrite1h;
+}
+
+function cfRate(model, prices, { cachedTokens, cacheCreation5mTokens, cacheCreation1hTokens }) {
+  const rate = findRate(model, prices);
   // The execution export has inclusive output, not a reliable reasoning split.
   if (!rate || rate.output !== rate.reasoning) return null;
-  for (const key of ['input','output',...(cachedTokens > 0 ? ['cacheRead'] : [])]) {
-    if (typeof rate[key] !== 'number' || !Number.isFinite(rate[key]) || rate[key] < 0) return null;
+  const required = ['input', 'output', ...(cachedTokens > 0 ? ['cacheRead'] : [])];
+  if (cacheCreation5mTokens > 0) required.push('cacheWrite5m');
+  if (cacheCreation1hTokens > 0) required.push('cacheWrite1h');
+  for (const key of required) {
+    const value = key === 'cacheWrite5m' ? cfCacheWriteRate(rate, '5m')
+      : key === 'cacheWrite1h' ? cfCacheWriteRate(rate, '1h') : rate[key];
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return null;
   }
   return rate;
 }
@@ -43,7 +53,10 @@ export function estimateCodeModeCost(rows, prices = {}, options = {}) {
     const tools = histogram.reduce((sum,[k,n]) => cfTokens(sum+Number(k)*n),0);
     if (!tools) { out.excluded.zeroTools++; continue; }
     const P = row.fullInputTokens, C = row.cacheReadTokens, O = row.outputTokens;
-    if (![P,C,O].every(n => Number.isSafeInteger(n) && n >= 0) || P === 0 || C > P) {
+    const cacheCreation5mTokens = row.cacheCreation5mTokens ?? 0;
+    const cacheCreation1hTokens = row.cacheCreation1hTokens ?? 0;
+    if (![P, C, O, cacheCreation5mTokens, cacheCreation1hTokens].every(n => Number.isSafeInteger(n) && n >= 0)
+      || P === 0 || C + cacheCreation5mTokens + cacheCreation1hTokens > P) {
       out.excluded.missingUsage++; continue;
     }
     out.eligibleRows++; out.eligibleExecs = cfTokens(out.eligibleExecs + row.execCalls);
@@ -70,9 +83,18 @@ export function estimateCodeModeCost(rows, prices = {}, options = {}) {
     out.addedUncachedTokens = cfFinite(out.addedUncachedTokens+extraUncached);
     actualInput = cfTokens(actualInput+P); actualOutput = cfTokens(actualOutput+O);
     directInput = cfTokens(directInput+nextInput); directOutput = cfTokens(directOutput+nextOutput);
-    const rate = cfRate(row.model,prices,C+extraCached);
+    const rate = cfRate(row.model, prices, {
+      cachedTokens: C + extraCached,
+      cacheCreation5mTokens,
+      cacheCreation1hTokens,
+    });
     if (rate) {
-      const prefixCost = cfFinite((P-C)*rate.input + C*(rate.cacheRead ?? 0));
+      const cacheWrite5m = cfCacheWriteRate(rate, '5m') ?? 0;
+      const cacheWrite1h = cfCacheWriteRate(rate, '1h') ?? 0;
+      const prefixCost = cfFinite((P - C - cacheCreation5mTokens - cacheCreation1hTokens) * rate.input
+        + C * (rate.cacheRead ?? 0)
+        + cacheCreation5mTokens * cacheWrite5m
+        + cacheCreation1hTokens * cacheWrite1h);
       actualCost = cfFinite(actualCost+(prefixCost+O*rate.output)/1e6);
       directCost = cfFinite(directCost+(prefixCost+extraUncached*rate.input+extraCached*(rate.cacheRead ?? 0)+nextOutput*rate.output)/1e6);
       out.pricedRows++;

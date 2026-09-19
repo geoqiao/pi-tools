@@ -1,12 +1,12 @@
 # Vibe Usage parser attribution
 
 Source: https://github.com/vibe-cafe/vibe-usage
-Version: 0.10.21
-Commit: `8f8d88fd70612b3853363eb0bd2ff3ba6ae2ef79`
+Version: 0.11.1
+Commit: `4a4dcc09f1510c7c732525a9e736068c60ff2a36`
 License: MIT (declared in upstream package.json and README; that commit has no standalone LICENSE file).
 Attribution: Vibe Usage contributors / vibe-cafe.
 
-Only the transitive parser dependency closure is included (46 source files).
+Only the transitive parser dependency closure is included (57 source files).
 The upload API, sync orchestrator, account configuration, daemon, reset, CLI router and
 server-backed summary are deliberately absent. This is an independent package, not an official VibeCafé client.
 
@@ -16,8 +16,9 @@ Local patches:
 |---|---|
 | src/parsers/cursor.js | Fixed cursor.com export URL; use the restricted sourceFetch boundary; reject redirects. |
 | src/parsers/antigravity.js | Route loopback read RPC through the same restricted boundary. |
-| src/parsers/codex-cache.js | Separate PI_USAGE_CACHE_DIR / ~/.pi/usage/cache from the upstream upload client's storage; parser algorithm v4 invalidates pre-classification results and tails. |
+| src/parsers/codex-cache.js | Separate PI_USAGE_CACHE_DIR / ~/.pi/usage/cache from the upstream upload client's storage; parser algorithm v5 invalidates pre-segment/pre-classification results and tails. |
 | src/parsers/codex.js | Classify complete per-request response intervals; validate optional completion-ledger usage/IDs; retain unknown for ambiguous/cumulative evidence. Preserve requestType through file and tail aggregation without changing usage/replay accounting. |
+| src/parsers/codex-segments.js | Preserve only bounded response classification metadata (type/role/phase/IDs, turn ID, structural content types, and token usage fields) through multi-rollout merging; never retain response text or tool arguments. |
 | src/parsers/zcode.js | Join tool parts by message_id using EXISTS; require finish=stop for non-tool responses; retain unknown with missing part schema or malformed evidence. |
 | src/parsers/kimi-code.js | Match current step UUID/turn/usage and legacy completed-step evidence; isolate retry/compaction/subagent output and merge classification across existing message-ID deduplication. |
 | src/parsers/aggregate.js | Preserve requestType in bucket grouping; use collision-safe tuple keys. |
@@ -27,7 +28,7 @@ Local patches:
 
 `upstream-files.json` preserves original source SHA-256 hashes. Other source files are copied
 unchanged. Retained upstream parser tests use PI_USAGE_CACHE_DIR instead of VIBE_USAGE_CACHE_DIR.
-Upload/sync tests do not apply and are not included. Tests are not in the published tarball.
+The safe upstream test helper test-support/file-permissions.js is retained only for parser tests. Upload/sync tests do not apply and are not included. Tests are not in the published tarball.
 
 ## Classification evidence
 

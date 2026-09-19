@@ -30,12 +30,13 @@ test('CLI local import -> HTML/JSON/CSV, refuses overwrites and validates option
     assert.throws(() => execFileSync(process.execPath, [cli, '--days', '-1'], { stdio: 'pipe' }));
     assert.throws(() => execFileSync(process.execPath, [cli, '--sources', 'bad-source'], { stdio: 'pipe' }));
     const sources = execFileSync(process.execPath, [cli, '--list-sources'], { encoding: 'utf8' }).trim().split('\n');
-    assert.equal(sources.length, 28); assert.ok(sources.includes('cursor'));
+    assert.equal(sources.length, 33); assert.ok(sources.includes('cursor'));
+    for (const source of ['qoder', 'qoder-cn', 'cola', 'devin', 'codebuddy']) assert.ok(sources.includes(source));
     if (process.platform !== 'win32') {
       const binLink = join(root, 'pi-usage');
       await symlink(cli, binLink);
       const linked = execFileSync(process.execPath, [binLink, '--list-sources'], { encoding: 'utf8' });
-      assert.equal(linked.trim().split('\n').length, 28, 'npm bin symlinks must execute the CLI');
+      assert.equal(linked.trim().split('\n').length, 33, 'npm bin symlinks must execute the CLI');
     }
   } finally { await rm(root, { recursive: true, force: true }); }
 });
@@ -75,7 +76,7 @@ test('CLI preserves explicit all/selected source scope, including empty sources'
       assert.equal(report.collectionScope.kind, sources ? 'selected' : 'all');
       assert.equal(report.collectionScope.offline, true);
       assert.deepEqual(report.collectionScope.sources, report.statuses.map(row => row.source));
-      assert.equal(report.collectionScope.sources.length, sources ? 3 : 28);
+      assert.equal(report.collectionScope.sources.length, sources ? 3 : 33);
       assert.ok(report.statuses.every(row => row.state === 'empty'));
       assert.deepEqual(report.buckets, []);
     }

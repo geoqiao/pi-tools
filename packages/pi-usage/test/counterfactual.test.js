@@ -98,6 +98,22 @@ test('cache sensitivity changes money not token totals; missing cache fee and di
   assert.equal(estimateCodeModeCost([sample()], { synthetic: { ...prices.synthetic, reasoning: 12 } }).pricedRows, 0);
 });
 
+test('counterfactuals preserve observed 5m/1h write costs and reject missing TTL rates', () => {
+  const row = { ...sample({ fullInputTokens: 130, cacheReadTokens: 80 }), cacheCreation5mTokens: 10, cacheCreation1hTokens: 20 };
+  const ttlPrices = { synthetic: { ...prices.synthetic, cacheWrite5m: 1, cacheWrite1h: 4 } };
+  const priced = estimateCodeModeCost([row], ttlPrices);
+  assert.equal(priced.pricedRows, 1);
+  close(priced.actual.cost, .00037);
+  close(priced.direct.cost, .00065);
+  close(priced.delta.cost, .00028);
+  const missing1h = { synthetic: { ...ttlPrices.synthetic } };
+  delete missing1h.synthetic.cacheWrite1h;
+  const unpriced = estimateCodeModeCost([row], missing1h);
+  assert.equal(unpriced.eligibleRows, 1);
+  assert.equal(unpriced.pricedRows, 0, 'missing 1h writes stay unpriced');
+  assert.equal(unpriced.actual.cost, null);
+});
+
 test('zero-rate eligible samples are free in this price basis, unlike unavailable samples', () => {
   const s = estimateCodeModeCost([sample()], { synthetic: { input: 0, cacheRead: 0, output: 0, reasoning: 0 } });
   assert.equal(s.pricedRows, 1); assert.equal(s.actual.cost, 0); assert.equal(s.direct.cost, 0);

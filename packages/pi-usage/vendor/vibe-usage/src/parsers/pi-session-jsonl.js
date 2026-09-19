@@ -13,12 +13,13 @@ function warn(ctx, message) {
 }
 
 function findJsonlFiles(dir, includeFile, ctx) {
-  if (!existsSync(dir)) return [];
   let children;
   try {
     children = readdirSync(dir, { withFileTypes: true });
   } catch (err) {
-    warn(ctx, `${ctx.source}: cannot read directory ${dir}: ${err.message}`);
+    if (err.code !== 'ENOENT') {
+      warn(ctx, `${ctx.source}: cannot read directory ${dir}: ${err.message}`);
+    }
     return [];
   }
 
@@ -58,6 +59,7 @@ export async function parsePiSessionJsonl({
   sessionsDirs,
   includeFile = () => true,
   projectFromPath = projectFromFirstDir,
+  deduplicateCopiedSessions = false,
 }) {
   const ctx = { source, warnings: [], incomplete: false };
   const entriesById = new Map();
@@ -65,6 +67,7 @@ export async function parsePiSessionJsonl({
   const eventsById = new Map();
   const anonymousEvents = [];
   const seenFiles = new Set();
+  const recordOwners = new Map();
   const execution = source === 'pi-coding-agent' ? createPiExecutionCollector(source) : null;
 
   for (const sessionsDir of sessionsDirs) {
@@ -83,6 +86,8 @@ export async function parsePiSessionJsonl({
 
       let sessionId = basename(filePath, '.jsonl');
       let project = projectFromPath(filePath, sessionsDir) || 'unknown';
+      let sessionStartedAt = Infinity;
+      let seenHeader = false;
       execution?.beginFile();
 
       for (const line of content.split('\n')) {
@@ -93,19 +98,42 @@ export async function parsePiSessionJsonl({
         } catch {
           continue;
         }
+        if (!obj || typeof obj !== 'object') continue;
 
         if (obj.type === 'session') {
+          if (deduplicateCopiedSessions && seenHeader) continue;
+          seenHeader = true;
           if (obj.id) sessionId = String(obj.id);
           if (obj.cwd) project = projectFromCwd(obj.cwd);
+          const startedAt = new Date(obj.timestamp).getTime();
+          sessionStartedAt = Number.isFinite(startedAt) ? startedAt : Infinity;
           continue;
         }
         if (obj.type !== 'message' || !obj.message) continue;
 
         const message = obj.message;
-        const timestamp = new Date(obj.timestamp || message.timestamp || 0);
+        const rawTimestamp = obj.timestamp || message.timestamp;
+        const timestamp = new Date(rawTimestamp || 0);
         if (Number.isNaN(timestamp.getTime())) continue;
-        const recordId = obj.id ? `${sessionId}:${obj.id}` : null;
+        const model = message.model || message.modelId || obj.model || obj.modelId || 'unknown';
+        // Cola copies a transcript with a new session header but unchanged
+        // records. Its short message ids are only unique within a session, so
+        // cross-session dedup also requires time, parent, role, and model.
+        // All existing Pi-family callers retain sessionId:id identities.
+        const recordId = !obj.id ? null : deduplicateCopiedSessions && rawTimestamp
+          ? JSON.stringify([obj.id, timestamp.getTime(), obj.parentId ?? null, message.role, model])
+          : `${sessionId}:${obj.id}`;
+
         execution?.observe(obj, { sessionId, project });
+
+        if (deduplicateCopiedSessions && recordId) {
+          const owner = recordOwners.get(recordId);
+          if (!owner || sessionStartedAt < owner.startedAt
+            || (sessionStartedAt === owner.startedAt && sessionId < owner.sessionId)
+            || (sessionStartedAt === owner.startedAt && sessionId === owner.sessionId && canonical < owner.filePath)) {
+            recordOwners.set(recordId, { sessionId, project, startedAt: sessionStartedAt, filePath: canonical });
+          }
+        }
 
         if (message.role === 'user' || message.role === 'assistant' || message.role === 'toolResult') {
           const event = {
@@ -136,7 +164,7 @@ export async function parsePiSessionJsonl({
         const entry = {
           source,
           requestType: requestTypeFor(message),
-          model: message.model || message.modelId || obj.model || obj.modelId || 'unknown',
+          model,
           project,
           timestamp,
           inputTokens,
@@ -158,9 +186,18 @@ export async function parsePiSessionJsonl({
 
   const entries = [
     ...anonymousEntries,
-    ...[...entriesById.values()].map(({ entry }) => entry),
+    ...[...entriesById].map(([id, { entry }]) => {
+      const owner = recordOwners.get(id);
+      return owner ? { ...entry, project: owner.project } : entry;
+    }),
   ];
-  const events = [...anonymousEvents, ...eventsById.values()];
+  const events = [
+    ...anonymousEvents,
+    ...[...eventsById].map(([id, event]) => {
+      const owner = recordOwners.get(id);
+      return owner ? { ...event, sessionId: owner.sessionId, project: owner.project } : event;
+    }),
+  ];
   const executionResult = execution?.finish();
   if (executionResult) ctx.warnings.push(...executionResult.warnings);
   return {

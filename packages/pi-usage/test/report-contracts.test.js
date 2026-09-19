@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Script } from 'node:vm';
-import { renderReport, bundleBrowserScript, EXECUTION_COLUMNS as reportExecutionColumns } from '../src/report.js';
+import { renderReport, bundleBrowserScript, DETAIL_COLUMNS, EXECUTION_COLUMNS as reportExecutionColumns } from '../src/report.js';
 import { COUNTERFACTUAL_CSV_COLUMNS, EXECUTION_COLUMNS as sharedExecutionColumns } from '../src/web/report-contracts.js';
 
 test('execution and counterfactual exports keep their established column order', () => {
@@ -28,6 +28,16 @@ test('execution and counterfactual exports keep their established column order',
     'knownActualCost', 'directInputTokens', 'directOutputTokens', 'directTotalTokens',
     'directCost', 'knownDirectCost', 'deltaInputTokens', 'deltaOutputTokens', 'deltaTotalTokens',
     'deltaCost', 'knownDeltaCost',
+  ]);
+});
+
+test('details CSV carries both cache-write token fields and cost components', () => {
+  assert.deepEqual([...DETAIL_COLUMNS], [
+    'date', 'source', 'model', 'project', 'hostname', 'requestType', 'bucketStart',
+    'inputTokens', 'cachedInputTokens', 'outputTokens', 'reasoningOutputTokens',
+    'cacheCreation5mTokens', 'cacheCreation1hTokens', 'totalTokens', 'allTokens',
+    'inputCost', 'cacheCost', 'outputCost', 'reasoningCost', 'cacheWrite5mCost',
+    'cacheWrite1hCost', 'estimatedCost',
   ]);
 });
 

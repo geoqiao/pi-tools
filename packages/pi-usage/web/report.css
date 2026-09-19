@@ -448,7 +448,7 @@ main {
 
 .metrics .composition {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   padding: 0;
 }
 
@@ -1363,6 +1363,7 @@ noscript {
   .metrics .composition {
     grid-column: 1/-1;
     grid-row: 2;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     border-top: 1px solid var(--line);
   }
   .metrics>div {

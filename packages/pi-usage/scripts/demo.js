@@ -28,7 +28,7 @@ for (let d = 0; d < demoDays; d++) {
   for (let m = 0; m < 4; m++) {
     const date = shiftDate(from, d);
     const scale = ((d * 17 + m * 11) % 61 + 4) * 4700;
-    buckets.push({ source: ['codex', 'claude-code', 'pi-coding-agent', 'pi-coding-agent'][m], model: modelIds[m], requestType: ['non_tool', 'tool', 'other'][(d + m) % 3], project: projectIds[m], hostname: 'local-device', bucketStart: `${date}T${String((d + m * 3) % 24).padStart(2, '0')}:00:00Z`, inputTokens: scale, cachedInputTokens: scale * 12, outputTokens: Math.floor(scale / 12), reasoningOutputTokens: Math.floor(scale / 18) });
+    buckets.push({ source: ['codex', 'claude-code', 'pi-coding-agent', 'pi-coding-agent'][m], model: modelIds[m], requestType: ['non_tool', 'tool', 'other'][(d + m) % 3], project: projectIds[m], hostname: 'local-device', bucketStart: `${date}T${String((d + m * 3) % 24).padStart(2, '0')}:00:00Z`, inputTokens: scale, cachedInputTokens: scale * 12, outputTokens: Math.floor(scale / 12), reasoningOutputTokens: Math.floor(scale / 18), cacheCreation5mTokens: m === 1 ? Math.floor(scale / 10) : 0, cacheCreation1hTokens: m === 1 ? Math.floor(scale / 20) : 0 });
     sessions.push({ source: buckets.at(-1).source, project: buckets.at(-1).project, hostname: 'local-device', sessionHash: `demo-${d}-${m}`, firstMessageAt: `${date}T08:00:00Z`, lastMessageAt: `${date}T09:00:00Z`, durationSeconds: 3600, activeSeconds: 1400 + d, messageCount: 60, userMessageCount: 8 });
   }
   if (d % 9 !== 0) {
@@ -95,6 +95,14 @@ if (output) {
   const shortReport = { ...common, from: shortFrom, to, collectionScope: scope, ...shortData, statuses: statusesFor(shortData) };
   associatedPaths.push(await writeReport(shortReport, join(output, 'short')));
   const { collectionScope: _scope, execution: _execution, ...legacyReport } = shortReport;
+  // Model a pre-TTL-split v2 report: old parsers folded cache writes into
+  // inputTokens, and the two newer fields were absent altogether.
+  legacyReport.buckets = legacyReport.buckets.map(({ cacheCreation5mTokens, cacheCreation1hTokens, ...row }) => ({
+    ...row,
+    inputTokens: row.inputTokens + cacheCreation5mTokens + cacheCreation1hTokens,
+    totalTokens: row.totalTokens,
+    allTokens: row.allTokens,
+  }));
   associatedPaths.push(await writeReport(legacyReport, join(output, 'legacy')));
 }
 console.log(associatedPaths.join('\n'));

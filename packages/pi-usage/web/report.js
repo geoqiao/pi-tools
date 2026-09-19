@@ -1,4 +1,4 @@
-import { DIMENSIONS, QUANTILES, REQUEST_TYPES, TOKEN_FIELDS, dailyRows, detailRows, findRate, groupRows, quantile, reportDatePreset, selectData, simulateModels, summarize, toCsv, tokenMillions } from '../src/analytics.js';
+import { COST_FIELDS, DIMENSIONS, QUANTILES, REQUEST_TYPES, TOKEN_FIELDS, dailyRows, detailRows, findRate, groupRows, quantile, reportDatePreset, selectData, simulateModels, summarize, toCsv, tokenMillions } from '../src/analytics.js';
 import { groupExecution, selectExecution, summarizeExecution } from '../src/execution.js';
 import { estimateCodeModeCost } from '../src/counterfactual.js';
 import { COUNTERFACTUAL_CSV_COLUMNS, EXECUTION_COLUMNS } from '../src/web/report-contracts.js';
@@ -14,10 +14,10 @@ const tokenText = value => tokenMillions(value);
 // Headlines and axis labels prioritize readability; titles/exports retain precision.
 const shortTokenText = (value, digits = 4) => tokenText(typeof value === 'number' && Number.isFinite(value) ? Number(value.toPrecision(digits)) : value);
 const percent = value => value == null ? '—' : `${(value * 100).toFixed(1)}%`;
-const labels = { inputTokens: '输入（M，含缓存写）', cachedInputTokens: '缓存读取（M）', outputTokens: '输出（M）', reasoningOutputTokens: '推理（M）', totalTokens: 'Token（M，不含缓存）', allTokens: 'Token（M，含缓存）', estimatedCost: '完整日金额', knownCost: '已知金额小计' };
-const shortLabels = ['输入（M）/含缓存写', '缓存读取（M）', '输出（M）', '推理（M）'];
+const labels = { inputTokens: '输入（M）', cachedInputTokens: '缓存读取（M）', outputTokens: '输出（M）', reasoningOutputTokens: '推理（M）', cacheCreation5mTokens: '缓存写 5m（M）', cacheCreation1hTokens: '缓存写 1h（M）', totalTokens: 'Token（M，不含缓存读）', allTokens: 'Token（M，含缓存读）', estimatedCost: '完整日金额', knownCost: '已知金额小计' };
+const shortLabels = ['输入（M）', '缓存读取（M）', '输出（M）', '推理（M）', '缓存写 5m（M）', '缓存写 1h（M）'];
 const dimensions = { source: 'Harness', model: '模型', project: '项目', hostname: '终端', requestType: '请求类型' };
-const colors = ['#3978ca', '#85aace', '#188c88', '#8972bc'];
+const colors = ['#3978ca', '#85aace', '#188c88', '#8972bc', '#d28b45', '#b85d3c'];
 const typeColors = ['#3978ca', '#188c88', '#b4bfce'];
 const rangeLabels = ['Min', 'P25', 'P50', 'P75', 'P90', 'Max'];
 const rangeValues = row => [row.min, ...row.values, row.max];
@@ -48,8 +48,21 @@ const icons = {
 const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${icons[name] ?? icons.info}</svg>`;
 for (const node of document.querySelectorAll('[data-icon]')) node.innerHTML = icon(node.dataset.icon);
 let pageIndex = 0, currentRows = [], currentBuckets = [], currentExecutionRows = [], currentSummary = null, currentFilters, currentCounterfactual = null, showAll = false, showAllExecutionSessions = false, currentDays = [], calendar = [], activeView = 'overview', activePreset = 'all';
-for (const row of DATA.buckets) row.requestType ??= 'other';
-const executionData = Array.isArray(DATA.execution) ? DATA.execution : [];
+DATA.buckets = Array.isArray(DATA.buckets) ? DATA.buckets : [];
+DATA.sessions = Array.isArray(DATA.sessions) ? DATA.sessions : [];
+DATA.execution = Array.isArray(DATA.execution) ? DATA.execution : [];
+DATA.prices = DATA.prices && typeof DATA.prices === 'object' ? DATA.prices : {};
+DATA.priceSnapshot = DATA.priceSnapshot && typeof DATA.priceSnapshot === 'object' ? DATA.priceSnapshot : {};
+for (const row of DATA.buckets) {
+  row.requestType ??= 'other';
+  for (const field of TOKEN_FIELDS) row[field] ??= 0;
+  // Reports produced before the TTL split already have authoritative totals.
+  // Synthesize only totals missing from older or raw imports.
+  row.totalTokens ??= row.inputTokens + row.outputTokens + row.reasoningOutputTokens
+    + row.cacheCreation5mTokens + row.cacheCreation1hTokens;
+  row.allTokens ??= row.totalTokens + row.cachedInputTokens;
+}
+const executionData = DATA.execution;
 const usedModels = [...new Set(DATA.buckets.map(row => row.model))].sort();
 const statusRows = Array.isArray(DATA.statuses) ? DATA.statuses : [];
 const recordedSources = [...new Set([...DATA.buckets, ...executionData].map(row => row.source).filter(Boolean))].sort();
@@ -87,15 +100,15 @@ function collectionScopeLabel() {
   return `${label} · ${collectionScope.sources.length} 个${collectionScope.offline ? ' · 离线' : ''}`;
 }
 const help = {
-  trend: '每根柱表示一天，点击或按 Enter / 空格筛选。四类 Token 互斥堆叠；金额模式仅显示已知小计。灰色底标为无记录，不能断言未使用；黄色底标为未完整定价。截止日可能尚未结束。',
+  trend: '每根柱表示一天，点击或按 Enter / 空格筛选。六类 Token 互斥堆叠；金额模式仅显示已知小计。灰色底标为无记录，不能断言未使用；黄色底标为未完整定价。截止日可能尚未结束。',
   request: '占比按含缓存 Token 计算，不是请求次数。含工具分类表示响应中有工具调用的整条 response usage，不是独立执行次数，也不按工具数重复计量。整条请求归入非工具、含工具、其他三类之一，合计等于总量；文字与调用混合仍归含工具。已接入 Pi / OMP、Claude、Codex、ZCode、Kimi 的可靠响应证据；缺边界、累计回退或关联冲突等保留为其他，不等于非工具。',
   quantile: 'Min / P25 / P50 / P75 / P90 / Max 使用同一样本，分位采用线性插值。默认只纳入有用量日；将无记录日按 0 纳入是计算假设。小样本仅描述已有记录，不代表稳定规律；极值不是预算或预测边界。',
   cost: '完整日金额分布排除未完整定价日期，可能造成样本偏差，不代表全部使用日。已知小计分布另列，不冒充完整日金额。可计价 Token 覆盖率不是账单覆盖率。',
-  simulation: '固定当前筛选每天的输入（含缓存写）、缓存读取、输出、推理数量，分别按本报告用过的模型费率逐日计价，再求 Min / 分位 / Max。原模型未定价不影响目标模型计价；目标费率不足或无样本不显示 0。假设 Token 数不随模型变化，不是实际节省或质量预测。',
+  simulation: '固定当前筛选每天的输入、缓存写入、缓存读取、输出、推理数量，分别按本报告用过的模型费率逐日计价，再求 Min / 分位 / Max。原模型未定价不影响目标模型计价；目标费率不足或无样本不显示 0。假设 Token 数不随模型变化，不是实际节省或质量预测。',
   details: '当前 CSV 与页面相同，按日期 × Harness × 模型 × 项目 × 终端 × 请求类型聚合。knownCost 是已知小计，estimatedCost 仅在完整定价时有值，coverage 按含缓存 Token 计算。同目录 details.csv / usage.json 仍是原始粒度。',
   execution: '执行视图只统计原生 Pi assistant 响应中的 exec / wait 证据。已记录响应不等于完整 HTTP/API 请求或计费次数；其他 Harness、旧导入和缺失 execution 数据没有证据，不显示为零。精确直方图排除 pending / unknown；不完整工具、嵌套错误和 shell 非零数是 trace 观察下限，不推断成功率或失败率。',
   'execution-trend': '趋势按日期合并执行响应。工具数均值、中位数和 P75 只使用已完成且可核对的精确 exec 样本；pending / unknown 不按零处理。点击日期会复用全局日期筛选。',
-  'code-mode-cost': '这是当前筛选历史窗口的局部固定历史 what-if：每个合格 code_mode 响应是一个锚点，用同一响应的完整输入、缓存读和输出估算直接调用情景。B 只控制情景中的直接模型轮次，不假定每个工具一次调用；all 是理想化独立工具批量。新增输入包含每个新增边界的完整前缀与新鲜输入，100% 缓存也不缓存新出现的输出或工具上下文。r 控制计费输出可回放到后续输入的比例：r=0 不自动把含思考输出当输入，r=1 也未必符合实际 API；r 不免除输出费用，q 仍全额计费。g 可补充未被 r 覆盖的可见调用/结果上下文，避免与回放双算。金额使用报告价格与本地覆盖的完整模型标识；pricedRows 为 0 时金额和小计均未知，不是 $0。未重建 cache 写 TTL 溢价、长上下文阶梯、上下文上限或压缩，部分 all / 100% cache 情景可能不可行。后续历史、等待、错误与工作结果保持固定，不是实测全会话节省率。',
+  'code-mode-cost': '这是当前筛选历史窗口的局部固定历史 what-if：每个合格 code_mode 响应是一个锚点，用同一响应的完整输入、缓存读和输出估算直接调用情景。B 只控制情景中的直接模型轮次，不假定每个工具一次调用；all 是理想化独立工具批量。新增输入包含每个新增边界的完整前缀与新鲜输入，100% 缓存也不缓存新出现的输出或工具上下文。r 控制计费输出可回放到后续输入的比例：r=0 不自动把含思考输出当输入，r=1 也未必符合实际 API；r 不免除输出费用，q 仍全额计费。g 可补充未被 r 覆盖的可见调用/结果上下文，避免与回放双算。金额使用报告价格与本地覆盖的完整模型标识；pricedRows 为 0 时金额和小计均未知，不是 $0。execution 证据缺少 TTL 拆分时不猜 cache 写费率，也不展开长上下文阶梯、上下文上限或压缩，部分 all / 100% cache 情景可能不可行。后续历史、等待、错误与工作结果保持固定，不是实测全会话节省率。',
 };
 function table(headers, rows) {
   if (!rows.length) return '<p class="empty">没有可用数据，请调整筛选。</p>';
@@ -172,10 +185,12 @@ for (const key of DIMENSIONS) {
   const values = key === 'requestType' ? Object.keys(REQUEST_TYPES) : [...new Set(sourceRows.map(row => row[key]).filter(value => value != null))].sort();
   for (const value of values) $(key).add(new Option(dimensionValue(key, value), value));
 }
-const generated = new Date(DATA.generatedAt).toLocaleString('zh-CN', { timeZone: DATA.timeZone });
+const generatedDate = DATA.generatedAt ? new Date(DATA.generatedAt) : null;
+const generated = generatedDate && Number.isFinite(generatedDate.getTime())
+  ? generatedDate.toLocaleString('zh-CN', { timeZone: DATA.timeZone }) : '—';
 $('collection-scope').textContent = collectionScopeLabel();
 $('collection-scope').title = collectionScopeDescriptionText;
-$('metadata').textContent = `${DATA.from} — ${DATA.to} · ${DATA.timeZone} · ${collectionScopeDescriptionText} · 数据快照 ${generated} · 价格快照 ${DATA.priceSnapshot.date} · 本地覆盖 ${DATA.priceSnapshot.overrideCount} 项`;
+$('metadata').textContent = `${DATA.from} — ${DATA.to} · ${DATA.timeZone} · ${collectionScopeDescriptionText} · 数据快照 ${generated} · 价格快照 ${DATA.priceSnapshot.date ?? '—'} · 本地覆盖 ${DATA.priceSnapshot.overrideCount ?? 0} 项`;
 $('collection-scope-detail').textContent = collectionScopeDescriptionText;
 $('footer-meta').textContent = `${DATA.timeZone} · ${generated}`;
 const incomplete = statusRows.filter(s => ['partial', 'error'].includes(s.state) || s.warningCount > 0);
@@ -186,14 +201,19 @@ if (incomplete.length) {
   $('warnings').textContent = `${incomplete.map(s => s.source).join('、')} 存在读取失败、未完成索引或警告。数据可能不完整；无记录不代表未使用。`;
 }
 $('source-status').innerHTML = table(['Harness', '状态', '原始记录（全历史）', '会话（全历史）', '说明'], statusRows.map(s => [s.source, ({ ok: '已读取', empty: '无记录', partial: '部分数据', error: '读取失败' })[s.state] ?? s.state, s.buckets, s.sessions, s.note]));
-$('price-table').innerHTML = table(['模型', '输入 $/M', '缓存读 $/M', '输出 $/M', '推理 $/M', '提供方', '出处', '备注'], usedModels.map(model => {
+function cacheWriteDisplayRate(rate, ttl) {
+  if (!rate) return undefined;
+  if (ttl === '5m') return Object.hasOwn(rate, 'cacheWrite5m') ? rate.cacheWrite5m : rate.cacheWrite;
+  return rate.cacheWrite1h;
+}
+$('price-table').innerHTML = table(['模型', '输入 $/M', '缓存读 $/M', '缓存写 5m $/M', '缓存写 1h $/M', '输出 $/M', '推理 $/M', '提供方', '出处', '备注'], usedModels.map(model => {
   const r = findRate(model, DATA.prices);
-  return [model, r?.input, r?.cacheRead, r?.output, r?.reasoning, r?.provider ?? '未识别', r?.reference ?? '请添加本地覆盖', r?.tiered ? '仅基础档；上下文阶梯未展开' : '基础费率'];
+  return [model, r?.input, r?.cacheRead, cacheWriteDisplayRate(r, '5m'), cacheWriteDisplayRate(r, '1h'), r?.output, r?.reasoning, r?.provider ?? '未识别', r?.reference ?? '请添加本地覆盖', r?.tiered ? '仅基础档；上下文阶梯未展开' : r?.cacheWriteReference ? '含官方 TTL 费率出处' : '基础费率'];
 }));
 
 function renderTrend(days) {
   const field = $('trend-metric').value, cost = field === 'cost', stacked = cost || field === 'tokens';
-  const keys = cost ? ['inputCost', 'cacheCost', 'outputCost', 'reasoningCost'] : field === 'tokens' ? TOKEN_FIELDS : [field];
+  const keys = cost ? COST_FIELDS : field === 'tokens' ? TOKEN_FIELDS : [field];
   const total = day => cost ? day.knownCost : field === 'tokens' ? day.allTokens : day[field];
   const valueText = value => cost ? money(value) : tokenText(value);
   const maximum = Math.max(1, ...days.map(total));
@@ -324,7 +344,7 @@ function renderPercentiles(days) {
   const complete = percentileMetric(days, 'estimatedCost');
   const excluded = days.length - complete.sampleDays;
   $('sample-note').textContent = `${$('include-zero').checked ? '日历日 · 无记录假设为 0' : '仅有用量日'} · ${days.length} 个样本${days.length < 7 ? ' · 小样本' : ''}`;
-  $('quantile-charts').innerHTML = `<div class="primary-distribution"><div class="quantile-title"><span>${labels.allTokens}</span><span>${all.sampleDays} 天 · 主指标</span></div>${rangeChart(all)}<div class="summary-stats">${summaryStats(all, tokenText)}</div><p class="distribution-note">优先查看含缓存总 Token 的 P50、P25–P75 与 P90；其他五项完整分位收在下方明细。</p></div>`;
+  $('quantile-charts').innerHTML = `<div class="primary-distribution"><div class="quantile-title"><span>${labels.allTokens}</span><span>${all.sampleDays} 天 · 主指标</span></div>${rangeChart(all)}<div class="summary-stats">${summaryStats(all, tokenText)}</div><p class="distribution-note">优先查看含缓存总 Token 的 P50、P25–P75 与 P90；其他七项完整分位收在下方明细。</p></div>`;
   $('cost-sample-note').textContent = `完整定价 ${complete.sampleDays} / ${days.length} 天 · 排除 ${excluded} 天。${excluded ? '排除日期可能造成样本偏差，不代表全部使用日。' : '公开费率估算，非实际账单。'}`;
   $('cost-range').innerHTML = rangeChart(complete, complete.max, money);
   $('cost-stats').innerHTML = summaryStats(complete, value => value == null ? '—' : money(value));
@@ -346,7 +366,7 @@ function renderSimulations() {
 function renderDetails() {
   const sorted = [...currentRows].sort((a, b) => $('sort').value === 'cost' ? (b.pricedTokens ? b.knownCost : -1) - (a.pricedTokens ? a.knownCost : -1) : $('sort').value === 'tokens' ? b.allTokens - a.allTokens : b.date.localeCompare(a.date));
   const pages = Math.max(1, Math.ceil(sorted.length / 50)); pageIndex = Math.min(pageIndex, pages - 1);
-  $('details').innerHTML = table(['日期', 'Harness', '模型', '项目', '终端', '请求类型', '输入（M，含缓存写）', '缓存读（M）', '输出（M）', '推理（M）', 'Token（M，含缓存）', 'Token（M，不含缓存）', '已知估算金额', '可计价 Token'], sorted.slice(pageIndex * 50, (pageIndex + 1) * 50).map(row => [row.date, ...DIMENSIONS.map(key => dimensionValue(key, row[key])), ...TOKEN_FIELDS.map(key => tokenText(row[key])), tokenText(row.allTokens), tokenText(row.totalTokens), costText(row), percent(row.coverage)]));
+  $('details').innerHTML = table(['日期', 'Harness', '模型', '项目', '终端', '请求类型', ...TOKEN_FIELDS.map(key => labels[key]), labels.allTokens, labels.totalTokens, '已知估算金额', '可计价 Token'], sorted.slice(pageIndex * 50, (pageIndex + 1) * 50).map(row => [row.date, ...DIMENSIONS.map(key => dimensionValue(key, row[key])), ...TOKEN_FIELDS.map(key => tokenText(row[key])), tokenText(row.allTokens), tokenText(row.totalTokens), costText(row), percent(row.coverage)]));
   $('page-status').textContent = `${pageIndex + 1} / ${pages} · ${full(sorted.length)} 条`;
   $('previous').disabled = pageIndex === 0; $('next').disabled = pageIndex >= pages - 1;
 }

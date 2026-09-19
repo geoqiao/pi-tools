@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { dirname, isAbsolute, join, posix, resolve, win32 } from 'node:path';
+import { delimiter, dirname, isAbsolute, join, posix, resolve, win32 } from 'node:path';
 import { homedir } from 'node:os';
+import { getOpenCodeStores } from './opencode-roots.js';
 import { findClaudeCodeDataDirs } from './claude-roots.js';
 import { findCindyDataDirs, getCindyDataRoots } from './cindy-roots.js';
 import { codexSessionDirs, resolveCodexHomes } from './codex-roots.js';
@@ -11,8 +12,12 @@ import {
   grokSessionsDir,
 } from './extra-roots.js';
 import { findClineDataDirs } from './cline-roots.js';
+import { findColaDataDirs, getColaSessionsDir } from './cola-roots.js';
 import { findCraftDataDirs } from './craft-roots.js';
+import { findHermesDataDirs, getHermesHome } from './hermes-roots.js';
+import { findKimiCodeDataDirs } from './kimi-roots.js';
 import { findOmpDataDirs, findPiDataDirs } from './pi-roots.js';
+import { findQoderDataDirs, getQoderProjectsDir } from './qoder-roots.js';
 import { findWorkbuddyDataDirs } from './workbuddy-roots.js';
 
 export function getAlmaDbPath(env = process.env, platform = process.platform, home = homedir()) {
@@ -120,13 +125,8 @@ export function findCodexDataDirs(codexExtraHome, extraRoots = []) {
 }
 
 // Kimi Code moved its store from ~/.kimi to ~/.kimi-code; recognize either so
-// users on either version are detected. The parser prefers ~/.kimi-code.
-function findKimiCodeDataDirs() {
-  return [
-    join(homedir(), '.kimi-code', 'sessions'),
-    join(homedir(), '.kimi', 'sessions'),
-  ].filter(existsSync);
-}
+// users on either version are detected. Kimi Work's embedded runtime home is
+// recognized too — see kimi-roots.js, which the parser uses as well.
 
 /** DeepSeek Harness home: DSH_HOME env (same as the dsh CLI) or ~/.dsh. */
 export function getDshHome(env = process.env) {
@@ -161,6 +161,16 @@ export function getMcodeDbPath(env = process.env, home = homedir()) {
   return join(root, 'v2', 'sqlite', 'runtime-state.sqlite');
 }
 
+// Devin (CLI and Desktop share one agent backend) keeps all sessions in a
+// single WAL database: $XDG_DATA_HOME/devin/cli/sessions.db, defaulting to
+// ~/.local/share/devin/cli/sessions.db. Fixture override: VIBE_USAGE_DEVIN_DB.
+export function getDevinDbPath(env = process.env, home = homedir()) {
+  const override = env.VIBE_USAGE_DEVIN_DB?.trim();
+  if (override) return isAbsolute(override) ? override : resolve(override);
+  const dataHome = env.XDG_DATA_HOME?.trim() || join(home, '.local', 'share');
+  return join(dataHome, 'devin', 'cli', 'sessions.db');
+}
+
 export function getMimocodeDbPath(env = process.env) {
   if (env.MIMOCODE_HOME && !isAbsolute(env.MIMOCODE_HOME)) {
     throw new Error(`MIMOCODE_HOME must be an absolute path, got: ${JSON.stringify(env.MIMOCODE_HOME)}`);
@@ -172,10 +182,21 @@ export function getMimocodeDbPath(env = process.env) {
   return isAbsolute(env.MIMOCODE_DB) ? env.MIMOCODE_DB : join(dataDir, env.MIMOCODE_DB);
 }
 
+export function getCodebuddyRoots(env = process.env, home = homedir()) {
+  const override = env.VIBE_USAGE_CODEBUDDY_DIRS?.trim();
+  if (override) return override.split(delimiter).map(value => value.trim()).filter(Boolean);
+  return [env.CODEBUDDY_CONFIG_DIR?.trim() || join(home, '.codebuddy')];
+}
+
+export function getZcodeDbPath(env = process.env, home = homedir()) {
+  const override = env.VIBE_USAGE_ZCODE_DB?.trim();
+  if (override) return isAbsolute(override) ? override : resolve(override);
+  return join(home, '.zcode', 'cli', 'db', 'db.sqlite');
+}
+
 export function findAntigravityDataDirs(extraRoots = []) {
   return [...new Set([
-    join(homedir(), '.gemini', 'antigravity'),
-    join(homedir(), '.gemini', 'antigravity-cli'),
+    ...antigravityConversationDirs(homedir()).map(dirname),
     ...extraRoots.flatMap(root => antigravityConversationDirs(root).map(dirname)),
   ])].filter(existsSync);
 }
@@ -256,7 +277,7 @@ export const TOOLS = [
     name: 'Claude Code',
     id: 'claude-code',
     dataDir: join(homedir(), '.claude', 'projects'),
-    detectDataDirs: findClaudeCodeDataDirs,
+    detectDataDirs: ({ extraRoots } = {}) => findClaudeCodeDataDirs(extraRootList(extraRoots?.['claude-code'])),
   },
   {
     name: 'Codex CLI',
@@ -265,6 +286,12 @@ export const TOOLS = [
     detectDataDirs: ({ codexExtraHome, extraRoots } = {}) => (
       findCodexDataDirs(codexExtraHome, extraRootList(extraRoots?.codex))
     ),
+  },
+  {
+    name: 'Cola',
+    id: 'cola',
+    dataDir: getColaSessionsDir(),
+    detectDataDirs: findColaDataDirs,
   },
   {
     name: 'Grok',
@@ -303,6 +330,9 @@ export const TOOLS = [
     name: 'OpenCode',
     id: 'opencode',
     dataDir: join(homedir(), '.local', 'share', 'opencode'),
+    detectDataDirs: ({ extraRoots } = {}) => getOpenCodeStores({
+      extraRoots: extraRootList(extraRoots?.opencode),
+    }).map(store => store.path),
   },
   {
     name: 'OpenClaw',
@@ -323,6 +353,20 @@ export const TOOLS = [
     detectDataDirs: ({ extraRoots } = {}) => (
       findPiDataDirs(extraRootList(extraRoots?.['pi-coding-agent']))
     ),
+  },
+  {
+    name: 'Qoder',
+    id: 'qoder',
+    // CLI + desktop app transcripts; the IDE's SharedClientCache/cache/db/local.db
+    // is detected too. `~/.qoder` alone is not proof (the IDE stores extensions there).
+    dataDir: getQoderProjectsDir('qoder'),
+    detectDataDirs: () => findQoderDataDirs('qoder'),
+  },
+  {
+    name: 'Qoder CN',
+    id: 'qoder-cn',
+    dataDir: getQoderProjectsDir('qoder-cn'),
+    detectDataDirs: () => findQoderDataDirs('qoder-cn'),
   },
   {
     name: 'Qwen Code',
@@ -382,7 +426,8 @@ export const TOOLS = [
   {
     name: 'Hermes',
     id: 'hermes',
-    dataDir: join(homedir(), '.hermes', 'state.db'),
+    dataDir: join(getHermesHome(), 'state.db'),
+    detectDataDirs: findHermesDataDirs,
   },
   {
     name: 'Kiro',
@@ -410,7 +455,19 @@ export const TOOLS = [
   {
     name: 'ZCode',
     id: 'zcode',
-    dataDir: join(homedir(), '.zcode', 'cli', 'db', 'db.sqlite'),
+    dataDir: getZcodeDbPath(),
+  },
+  {
+    name: 'CodeBuddy',
+    id: 'codebuddy',
+    dataDir: join(getCodebuddyRoots()[0], 'projects'),
+    detectDataDirs: () => getCodebuddyRoots().map(root => join(root, 'projects')).filter(existsSync),
+  },
+  {
+    name: 'Devin',
+    id: 'devin',
+    dataDir: getDevinDbPath(),
+    detectDataDirs: () => [getDevinDbPath()].filter(existsSync),
   },
 ];
 

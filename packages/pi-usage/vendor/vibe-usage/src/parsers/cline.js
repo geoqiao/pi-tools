@@ -2,11 +2,18 @@ import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import { aggregateToBuckets, extractSessions } from './aggregate.js';
 import { readJsonSafe, projectFromPath } from './fs-utils.js';
-import { findClineDataDirs } from '../cline-roots.js';
+import { findClineStores } from '../cline-roots.js';
+import { readClineSdk } from './cline-sdk.js';
 
 export async function parse() {
-  const extDirs = findClineDataDirs();
-  if (extDirs.length === 0) return { buckets: [], sessions: [] };
+  const warnings = [];
+  // Format drift or an unreadable root means we cannot describe the store:
+  // skip the source so its previous upload state survives. A single unreadable
+  // artifact only drops that artifact (it re-uploads on the next sync).
+  let fatal = false;
+  const onWarning = message => warnings.push(message);
+  const onFatal = message => { fatal = true; warnings.push(message); };
+  const { legacyRoots: extDirs, sdkSessionDirs } = findClineStores({ onWarning: onFatal });
 
   const entries = [];
   const events = [];
@@ -88,5 +95,9 @@ export async function parse() {
       }
   }
 
-  return { buckets: aggregateToBuckets(entries), sessions: extractSessions(events) };
+  const sdk = readClineSdk(sdkSessionDirs, { onWarning, onFatal });
+  if (fatal) return { buckets: [], sessions: [], skipped: true, warnings };
+  return { buckets: aggregateToBuckets([...entries, ...sdk.entries]),
+    sessions: extractSessions([...events, ...sdk.events]),
+    warnings };
 }

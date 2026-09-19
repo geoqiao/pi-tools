@@ -37,21 +37,21 @@ function codexFile(rows) {
   writeFileSync(path, jsonl([row('session_meta', { id: 's', cwd: '/synthetic/project' }), ...rows]));
   return path;
 }
-const fields = ['inputTokens', 'cachedInputTokens', 'outputTokens', 'reasoningOutputTokens'];
-const totals = buckets => fields.map(key => buckets.reduce((n, b) => n + b[key], 0));
-const classified = buckets => Object.fromEntries(buckets.map(b => [b.requestType ?? 'other', fields.reduce((n, key) => n + b[key], 0)]));
+const fields = ['inputTokens', 'cachedInputTokens', 'outputTokens', 'reasoningOutputTokens', 'cacheCreation5mTokens', 'cacheCreation1hTokens'];
+const totals = buckets => fields.map(key => buckets.reduce((n, b) => n + (b[key] ?? 0), 0));
+const classified = buckets => Object.fromEntries(buckets.map(b => [b.requestType ?? 'other', fields.reduce((n, key) => n + (b[key] ?? 0), 0)]));
 
 test('Codex partitions whole requests: text + parallel calls, final text, no evidence; duplicates count once', async () => {
   codexFile([start(), text(), item('function_call'), item('custom_tool_call'), item('function_call_output'), item('custom_tool_call_output'), count(1), count(1), text(), count(2), count(3)]);
   const result = await codex();
-  assert.deepEqual(totals(result.buckets), [180, 120, 45, 15]);
+  assert.deepEqual(totals(result.buckets), [180, 120, 45, 15, 0, 0]);
   assert.deepEqual(classified(result.buckets), { tool: 120, non_tool: 120, other: 120 });
 });
 
 test('Codex completion ledger is evidence, not another usage source; result events are not calls', async () => {
   codexFile([start(), text(), item('custom_tool_call'), record(), record(), row('event_msg', { type: 'item_completed', item: { type: 'ToolCall' } }), item('custom_tool_call_output'), count(1), text(), record('r2'), count(2), record('unmatched')]);
   const result = await codex();
-  assert.deepEqual(totals(result.buckets), [120, 80, 30, 10]);
+  assert.deepEqual(totals(result.buckets), [120, 80, 30, 10, 0, 0]);
   assert.deepEqual(classified(result.buckets), { tool: 120, non_tool: 120 });
 });
 
@@ -75,7 +75,7 @@ test('Codex unsafe intervals remain other without changing usage', async () => {
   for (const rows of cases) {
     codexFile(rows);
     const result = await codex();
-    assert.deepEqual(totals(result.buckets), [60, 40, 15, 5]);
+    assert.deepEqual(totals(result.buckets), [60, 40, 15, 5, 0, 0]);
     assert.deepEqual(classified(result.buckets), { other: 120 });
   }
 });
@@ -142,7 +142,7 @@ function zcodeDb(parts = true) {
 test('ZCode exact message_id join, multiple tools, finish requirement, malformed parts and missing schema', async () => {
   const result = await zcode({ dbPath: zcodeDb() });
   assert.deepEqual(classified(result.buckets), { tool: 120, non_tool: 120, other: 360 });
-  assert.deepEqual(totals(result.buckets), [300, 200, 75, 25]);
+  assert.deepEqual(totals(result.buckets), [300, 200, 75, 25, 0, 0]);
   const legacy = await zcode({ dbPath: zcodeDb(false) });
   assert.deepEqual(classified(legacy.buckets), { other: 600 });
   assert.deepEqual(totals(legacy.buckets), totals(result.buckets));
@@ -167,7 +167,7 @@ test('Kimi current matches step UUID + complete usage, mixed and parallel calls 
   kimiFile([begin(), loop('content.part', { stepUuid: 'step', part: { type: 'text' } }), tool(), tool(), end(), billed(), begin(), end(), billed(), billed({ usageScope: 'session' })]);
   const result = await kimi();
   assert.deepEqual(classified(result.buckets), { tool: 120, non_tool: 120, other: 120 });
-  assert.deepEqual(totals(result.buckets), [180, 120, 60, 0]);
+  assert.deepEqual(totals(result.buckets), [180, 120, 60, 0, 0, 0]);
 });
 
 test('Kimi current scope is not evidence: missing/mismatched/interleaved/truncated steps stay other', async () => {
@@ -194,7 +194,7 @@ test('Kimi current duplicate evidence does not double usage, repeated unlinked b
   kimiFile([begin(), tool(), tool(), end('tool_use'), end('tool_use'), billed(), billed()]);
   const result = await kimi();
   assert.deepEqual(classified(result.buckets), { tool: 120, other: 120 });
-  assert.deepEqual(totals(result.buckets), [120, 80, 40, 0]);
+  assert.deepEqual(totals(result.buckets), [120, 80, 40, 0, 0, 0]);
 });
 
 const legacy = (type, payload = {}) => ({ timestamp: Date.parse(timestamp) / 1000, message: { type, payload } });
@@ -206,7 +206,7 @@ test('Kimi legacy full-step completion, duplicate message IDs and positive tool 
   kimiFile([legacy('StepBegin'), part(), status('a'), legacy('StepBegin'), part(), call(), call(), status('a'), legacy('StepBegin'), part(), status('b'), status('c')], true);
   const result = await kimi();
   assert.deepEqual(classified(result.buckets), { tool: 120, non_tool: 120, other: 120 });
-  assert.deepEqual(totals(result.buckets), [180, 120, 60, 0]);
+  assert.deepEqual(totals(result.buckets), [180, 120, 60, 0, 0, 0]);
 });
 
 test('Kimi legacy retry, compaction, malformed and nested subagent evidence cannot leak', async () => {
