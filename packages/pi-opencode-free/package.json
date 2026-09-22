@@ -14,7 +14,8 @@
     "src",
     "README.md",
     "LICENSE",
-    "NOTICE.md"
+    "NOTICE.md",
+    "CHANGELOG.md"
   ],
   "pi": {
     "extensions": [
