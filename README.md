@@ -114,13 +114,26 @@ npx @geoqiao/pi-usage --days 90
 
 [Read the package guide →](packages/pi-usage)
 
+### OpenCode free models — [`@geoqiao/pi-opencode-free`](packages/pi-opencode-free)
+
+Use OpenCode's free models as a native Pi provider, with cached model discovery,
+Chat Completions and Responses streaming, and Pi-owned tools and compaction.
+This unofficial compatibility package remains subject to OpenCode's access policy.
+
+```bash
+pi install npm:@geoqiao/pi-opencode-free
+```
+
+[Read the package guide →](packages/pi-opencode-free)
+
 ## Workspace
 
 ```text
 packages/
 ├── pi-ask/      # Interactive clarification tool and ask-user skill
 ├── paseo-btw/   # Paseo side-conversation extension, CLI, and portable skill
-└── pi-usage/    # Local usage analytics, HTML reports, Pi command, and CLI
+├── pi-usage/    # Local usage analytics, HTML reports, Pi command, and CLI
+└── pi-opencode-free/ # Native OpenCode free-model provider and catalog refresh
 ```
 
 The packages share repository tooling but have no runtime coupling. Installing or releasing one

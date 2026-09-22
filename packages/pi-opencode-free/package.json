@@ -1,0 +1,33 @@
+{
+  "name": "@geoqiao/pi-opencode-free",
+  "version": "0.0.0",
+  "description": "OpenCode free models as a native Pi provider, with cached model discovery.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": ["pi-package", "opencode", "provider", "free-models"],
+  "files": ["src", "README.md", "LICENSE", "NOTICE.md"],
+  "pi": { "extensions": ["./src/index.ts"] },
+  "engines": { "node": ">=22.19.0" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/geoqiao/pi-tools.git",
+    "directory": "packages/pi-opencode-free"
+  },
+  "publishConfig": { "access": "public", "provenance": true },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "0.84.2",
+    "@earendil-works/pi-coding-agent": "0.84.2",
+    "@types/node": "25.6.0",
+    "typescript": "6.0.2"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.ts",
+    "test:live": "node scripts/live-check.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "pack:check": "pnpm pack --dry-run"
+  }
+}
