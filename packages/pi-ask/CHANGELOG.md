@@ -1,3 +1,9 @@
+## 1.3.5
+
+### Patch Changes
+
+- 310de3c: Include preserved answers and explicit clarification instructions in the tool text the model receives when the user chooses Elaborate.
+
 ## 1.3.4
 
 ### Patch Changes
