@@ -1,5 +1,7 @@
 # Paseo BTW
 
+> **Maintenance ended.** Existing releases remain available.
+
 [![npm version](https://img.shields.io/npm/v/@geoqiao/paseo-btw)](https://www.npmjs.com/package/@geoqiao/paseo-btw)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 

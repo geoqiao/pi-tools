@@ -1,5 +1,7 @@
 # @geoqiao/pi-opencode-free
 
+> **Maintenance ended.** Existing releases remain available.
+
 Use OpenCode's free models through a native Pi provider. Pi owns the conversation,
 system prompt, tools, extension hooks, compaction, branching, and cancellation.
 

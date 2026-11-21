@@ -12,6 +12,8 @@
 
 </div>
 
+> **Maintenance status.** Only [`pi-ask`](packages/pi-ask) is actively maintained. [`paseo-btw`](packages/paseo-btw), [`pi-usage`](packages/pi-usage), and [`pi-opencode-free`](packages/pi-opencode-free) are no longer maintained. Their existing releases remain available.
+
 `pi-tools` is a small monorepo for independently published Pi packages. Each package has its own
 version, manifest, documentation, tests, and release history—install only the tool you need.
 
