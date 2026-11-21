@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { successfulResponse } from "../src/ask-tool-helpers.ts";
 import { renderResultText } from "../src/result.ts";
 import { createInitialState } from "../src/state/create.ts";
 import { summarizeResult, toAskResult } from "../src/state/result.ts";
@@ -430,7 +431,7 @@ test("elaborate results include unselected notes in summary and render output", 
 		],
 	});
 	assert.equal(
-		summarizeResult(result),
+		summarizeResult(result).split("\n").slice(2).join("\n"),
 		[
 			'User asked to elaborate on question "Pick a framework" with note "Need SSR support"',
 			'User asked to elaborate on question "Pick a framework" option "React" with note "Legacy codebase"',
@@ -508,7 +509,7 @@ test("elaborate results keep committed answers alongside elaboration context", (
 		note: "Compare tradeoffs",
 	});
 	assert.equal(
-		summarizeResult(result),
+		summarizeResult(result).split("\n").at(-1),
 		'User asked to elaborate on question "Pick a framework" after current answer "Vue" with note "Compare tradeoffs"'
 	);
 	assert.equal(
@@ -540,7 +541,7 @@ test("elaboration summary includes custom answers in note context", () => {
 	const result = toAskResult(state);
 
 	assert.equal(
-		summarizeResult(result),
+		summarizeResult(result).split("\n").at(-1),
 		'User asked to elaborate on question "Pick a framework" after current answer "SolidStart" with note "Compare tradeoffs"'
 	);
 	assert.equal(
@@ -639,6 +640,56 @@ test("elaborate continuation preserves unrelated committed answers", () => {
 		},
 		strategy: "refine_only",
 	});
+});
+
+test("elaboration tool content carries preserved choices and an answer-first instruction", () => {
+	let state = createInitialState({
+		questions: [
+			{
+				id: "rollout",
+				prompt: "How should we deploy?",
+				options: [{ value: "canary", label: "Canary" }],
+			},
+			{
+				id: "scope",
+				prompt: "Where should this apply?",
+				options: [
+					{ value: "local", label: "Local only" },
+					{ value: "global", label: "Global change" },
+				],
+			},
+		],
+	});
+	state = enterQuestionNoteMode(state, "rollout");
+	state = saveNote(state, "Explain the tradeoffs");
+	state = moveTab(state, 1);
+
+	const [local, global] = [1, 2].map((index) =>
+		successfulResponse(
+			toAskResult({ ...applyNumberShortcut(state, index), mode: "elaborate" })
+		)
+	);
+	const localText = local.content[0].text;
+	const globalText = global.content[0].text;
+
+	assert.notEqual(localText, globalText);
+	assert.ok(
+		localText.includes(
+			'(question "scope"): values ["local"], labels ["Local only"]'
+		)
+	);
+	assert.ok(
+		globalText.includes(
+			'(question "scope"): values ["global"], labels ["Global change"]'
+		)
+	);
+	for (const text of [localText, globalText]) {
+		assert.ok(
+			text.includes("visible assistant text before any follow-up question")
+		);
+		assert.ok(text.includes("re-ask only the affected questions"));
+		assert.ok(text.includes("Explain the tradeoffs"));
+	}
 });
 
 test("elaboration preserves recommendation metadata", () => {

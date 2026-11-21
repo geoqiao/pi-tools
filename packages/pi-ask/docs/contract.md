@@ -175,6 +175,7 @@ This document defines the stable external behavior. It does not explain internal
 - in `mode: "elaborate"`, `answers` contains only committed answers; note-only entries move to `elaboration.items`
 - `continuation.strategy === "refine_only"` means the next ask should refine the current flow rather than restart it
 - `continuation.preservedAnswers` contains previously committed answers that should be kept as context and not re-asked
+- When the user elaborates on a note, the tool text includes clarification notes and preserved answers with their question IDs, option values, labels, and custom text when present. It asks the assistant to explain the notes in visible text before re-asking any affected question that still needs a choice.
 - `continuation.affectedQuestionIds` lists the only questions that should be revisited
 - `continuation.questionStates` marks each question as `answered`, `needs_clarification`, or `unanswered`
 - single-select answers still use arrays

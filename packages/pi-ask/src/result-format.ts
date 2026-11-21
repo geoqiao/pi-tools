@@ -100,9 +100,10 @@ function formatQuestionNoteLine(
 
 export function formatElaborationLines(
 	result: AskResult,
-	_options: { mode: "summary" | "render" }
+	options: { mode: "summary" | "render" }
 ): string[] {
-	const items = result.elaboration?.items ?? [];
+	const { elaboration } = result;
+	const items = elaboration?.items ?? [];
 	const lines = items.map((item) => {
 		const answerContext = formatElaborationAnswerContext(item.answer);
 		if (item.target.kind === "question") {
@@ -114,8 +115,15 @@ export function formatElaborationLines(
 		return `User asked to elaborate on question ${quote(item.question.prompt)} option ${quote(item.option.label)}${answerContext} with note ${quote(item.note)}`;
 	});
 
-	if (lines.length > 0) {
-		return lines;
+	if (elaboration && lines.length > 0) {
+		return options.mode === "summary"
+			? [
+					"Explain the requested clarification in visible assistant text before any follow-up question.",
+					elaboration.instruction,
+					...lines,
+					...formatPreservedAnswerLines(result),
+				]
+			: lines;
 	}
 
 	const answerLines = result.questions
@@ -128,6 +136,17 @@ export function formatElaborationLines(
 		.filter((line): line is string => Boolean(line));
 
 	return answerLines.length > 0 ? answerLines : [ELABORATED_SUMMARY];
+}
+
+function formatPreservedAnswerLines(result: AskResult): string[] {
+	const preservedAnswers = result.continuation?.preservedAnswers ?? {};
+	return Object.entries(preservedAnswers).map(([id, answer]) => {
+		const question = result.questions.find((entry) => entry.id === id);
+		const customText = answer.customText
+			? `, custom text ${quote(answer.customText)}`
+			: "";
+		return `Preserved answer for ${quote(question?.prompt ?? id)} (question ${quote(id)}): values ${JSON.stringify(answer.values)}, labels ${JSON.stringify(answer.labels)}${customText}`;
+	});
 }
 
 function formatElaborationAnswerContext(
