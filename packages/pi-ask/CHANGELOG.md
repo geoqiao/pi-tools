@@ -1,3 +1,9 @@
+## 1.3.4
+
+### Patch Changes
+
+- 8db7d66: Support Pi 1.6.0 tool schema types and skip unavailable extraction models in `/answer`.
+
 ## 1.3.3
 
 ### Patch Changes
