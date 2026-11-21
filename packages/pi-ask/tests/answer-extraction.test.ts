@@ -21,13 +21,8 @@ test("selectExtractionModel uses first configured model with auth", async () => 
 			model: model("fallback", "c"),
 			scopedModels: [],
 			modelRegistry: {
-				find(provider: string, _id: string) {
-					if (provider === "missing") {
-						return first;
-					}
-					if (provider === "ok") {
-						return second;
-					}
+				getAvailable() {
+					return [first, second];
 				},
 				getApiKeyAndHeaders(candidate: { provider: string }) {
 					if (candidate.provider === "ok") {
@@ -49,6 +44,31 @@ test("selectExtractionModel uses first configured model with auth", async () => 
 	});
 });
 
+test("selectExtractionModel skips an unavailable preferred model even when auth reports ok", async () => {
+	const unconfigured = model("unconfigured", "a");
+	const fallback = model("fallback", "b");
+	const result = await selectExtractionModel(
+		{
+			model: fallback,
+			scopedModels: [],
+			modelRegistry: {
+				find() {
+					return unconfigured;
+				},
+				getAvailable() {
+					return [fallback];
+				},
+				getApiKeyAndHeaders() {
+					return Promise.resolve({ ok: true });
+				},
+			},
+		} as never,
+		[{ provider: "unconfigured", id: "a" }]
+	);
+
+	assert.deepEqual(result, { model: fallback, usedFallback: true });
+});
+
 test("selectExtractionModel respects the current session model scope", async () => {
 	const configured = model("configured", "a");
 	const fallback = model("fallback", "b");
@@ -57,8 +77,8 @@ test("selectExtractionModel respects the current session model scope", async () 
 			model: fallback,
 			scopedModels: [{ model: fallback }],
 			modelRegistry: {
-				find() {
-					return configured;
+				getAvailable() {
+					return [configured, fallback];
 				},
 				getApiKeyAndHeaders() {
 					return Promise.resolve({ ok: true, apiKey: "key" });
@@ -78,8 +98,8 @@ test("selectExtractionModel rejects a fallback outside the current session scope
 			model: fallback,
 			scopedModels: [{ model: model("allowed", "b") }],
 			modelRegistry: {
-				find() {
-					return;
+				getAvailable() {
+					return [fallback];
 				},
 			},
 		} as never,
@@ -155,8 +175,8 @@ test("selectExtractionModel validates fallback model auth", async () => {
 			model: fallback,
 			scopedModels: [],
 			modelRegistry: {
-				find() {
-					return;
+				getAvailable() {
+					return [fallback];
 				},
 				getApiKeyAndHeaders() {
 					return Promise.resolve({ ok: false, error: "no auth" });

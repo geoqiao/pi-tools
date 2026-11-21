@@ -59,8 +59,13 @@ export async function selectExtractionModel(
 	ctx: Pick<ExtensionContext, "model" | "modelRegistry" | "scopedModels">,
 	preferences: AskConfig["answer"]["extractionModels"]
 ): Promise<SelectedExtractionModel | { error: string }> {
+	const availableModels = ctx.modelRegistry.getAvailable();
 	for (const preference of preferences) {
-		const model = ctx.modelRegistry.find(preference.provider, preference.id);
+		const model = availableModels.find(
+			(candidate) =>
+				candidate.provider === preference.provider &&
+				candidate.id === preference.id
+		);
 		if (!(model && isModelInScope(model, ctx.scopedModels))) {
 			continue;
 		}
@@ -83,14 +88,16 @@ export async function selectExtractionModel(
 		};
 	}
 
-	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
-	if (!auth.ok) {
-		return {
-			error: `No auth for fallback chat model: ${ctx.model.provider}/${ctx.model.id}.`,
-		};
+	if (
+		availableModels.some((model) => modelsAreEqual(model, ctx.model)) &&
+		(await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model)).ok
+	) {
+		return { model: ctx.model, usedFallback: true };
 	}
 
-	return { model: ctx.model, usedFallback: true };
+	return {
+		error: `No auth for fallback chat model: ${ctx.model.provider}/${ctx.model.id}.`,
+	};
 }
 
 function isModelInScope(

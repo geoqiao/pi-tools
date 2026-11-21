@@ -1,5 +1,7 @@
 # Pi Usage
 
+> **已停止维护。** 历史版本仍可安装。
+
 [![npm version](https://img.shields.io/npm/v/@geoqiao/pi-usage)](https://www.npmjs.com/package/@geoqiao/pi-usage)
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A5%2022.15-417e38)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
