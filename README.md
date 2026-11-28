@@ -14,6 +14,9 @@
 
 > **Maintenance status.** Only [`pi-ask`](packages/pi-ask) is actively maintained. [`paseo-btw`](packages/paseo-btw), [`pi-usage`](packages/pi-usage), and [`pi-opencode-free`](packages/pi-opencode-free) are no longer maintained. Their existing releases remain available.
 
+> **Guides & Setup Notes:** [Paseo Complete Setup & Usage Guide (中文)](https://geoqiao.me/blog/paseo-guide/) · [Pi Agent Setup List (2026-10)](https://geoqiao.me/blog/whats-on-my-pi-agent-october-2026/)
+> **Project Page:** [pi-tools on geoqiao.me](https://geoqiao.me/projects/pi-tools/)
+
 `pi-tools` is a small monorepo for independently published Pi packages. Each package has its own
 version, manifest, documentation, tests, and release history—install only the tool you need.
 
